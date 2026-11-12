@@ -28,8 +28,10 @@ revertir. Pendiente de instalación para compilar en teléfono: CocoaPods (iPhon
 | `power` | Ohm, caída de tensión, ampacidad con derating, generadores | 14 |
 | `storage` | Códecs (77 tasas), duración y copia DIT | 11 |
 
-Catálogos: gelatinas (31), cables H07RN-F y SOOW, códecs. Cada dato tiene su fuente en
-`docs/research/`.
+Catálogos: gelatinas (31), cables H07RN-F y SOOW, códecs (77 tasas), **cámaras (25 modelos,
+82 modos de grabación** con su área de imagen real) y **formatos fílmicos (12)**. Cada dato
+tiene su fuente en `docs/research/`, y lo que no se pudo verificar queda marcado como tal en
+vez de inventarse.
 
 ---
 
