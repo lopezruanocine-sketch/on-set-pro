@@ -1,9 +1,17 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'dart:math';
+
+import '../core/cine_data.dart';
 import '../core/localization.dart';
 import '../core/pro_input.dart';
-import '../core/cine_data.dart';
+import '../data/catalogs/camera_filters.dart';
+import '../data/catalogs/light_gels.dart';
+import '../domain/exposure/exposure_engine.dart';
+import '../state/shot_state.dart';
+import '../theme/app_theme.dart';
 
+/// Las cuatro herramientas de exposición, conectadas al motor de cálculo.
 class ExpoFotoTabs extends StatelessWidget {
   /// Pestaña que se abre primero (0 = zonas, 1 = fall-off, 2 = compensar,
   /// 3 = fotometría).
@@ -17,9 +25,9 @@ class ExpoFotoTabs extends StatelessWidget {
       length: 4,
       initialIndex: initialTab.clamp(0, 3),
       child: Scaffold(
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: OnSetColors.background,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF121212),
+          backgroundColor: OnSetColors.background,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           title: Text(
@@ -30,20 +38,19 @@ class ExpoFotoTabs extends StatelessWidget {
               letterSpacing: 1.0,
             ),
           ),
-          bottom: TabBar(
+          bottom: const TabBar(
             isScrollable: true,
-            indicatorColor: const Color(0xFFFFD700),
-            labelColor: const Color(0xFFFFD700),
+            indicatorColor: OnSetColors.brand,
+            labelColor: OnSetColors.brand,
             unselectedLabelColor: Colors.white38,
             tabs: [
-              const Tab(text: "MAPA DE ZONAS"),
-              const Tab(text: "FALL-OFF"),
-              Tab(text: t('comp')),
-              const Tab(text: "FOTOMETRÍA (LUX/F)"),
+              Tab(text: "MAPA DE ZONAS"),
+              Tab(text: "FALL-OFF"),
+              Tab(text: "COMPENSAR"),
+              Tab(text: "FOTOMETRÍA (LUX/F)"),
             ],
           ),
         ),
-        // QUITAMOS EL CONST DE AQUÍ PARA SOLUCIONAR LOS ERRORES
         body: const TabBarView(
           children: [
             ZoneSystemScreen(),
@@ -58,118 +65,155 @@ class ExpoFotoTabs extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------
-// 1. MAPA DE ZONAS (ESTILO REFERENCIA)
+// 1. MAPA DE ZONAS
 // -----------------------------------------------------------------
 class ZoneSystemScreen extends StatefulWidget {
   const ZoneSystemScreen({super.key});
+
   @override
   State<ZoneSystemScreen> createState() => _ZoneSystemScreenState();
 }
 
 class _ZoneSystemScreenState extends State<ZoneSystemScreen> {
   double cameraF = 2.8;
-  double meteredF = 16.0;
-  int targetZone = 8;
+  double meteredF = 2.8;
+  int targetZone = 5;
 
-  final List<Color> zoneColors = [
-    Colors.black,
-    const Color(0xFF1A1A1A),
-    const Color(0xFF333333),
-    const Color(0xFF4D4D4D),
-    const Color(0xFF666666),
-    const Color(0xFF808080),
-    const Color(0xFF999999),
-    const Color(0xFFB3B3B3),
-    const Color(0xFFCCCCCC),
-    const Color(0xFFE6E6E6),
-    Colors.white,
+  static const List<Color> zoneColors = [
+    Color(0xFF000000),
+    Color(0xFF1A1A1A),
+    Color(0xFF333333),
+    Color(0xFF4D4D4D),
+    Color(0xFF666666),
+    Color(0xFF808080),
+    Color(0xFF999999),
+    Color(0xFFB3B3B3),
+    Color(0xFFCCCCCC),
+    Color(0xFFE6E6E6),
+    Color(0xFFFFFFFF),
   ];
 
   @override
   Widget build(BuildContext context) {
-    double stopsDiff = 2 * (log(meteredF / cameraF) / ln2);
-    double currentZoneRaw = 5 + stopsDiff;
-    int currentZone = currentZoneRaw.round().clamp(0, 10);
-    double correctionNeeded = targetZone - currentZoneRaw;
+    return ListenableBuilder(
+      listenable: ShotState.instance,
+      builder: (context, _) {
+        final shot = ShotState.instance;
+        final reading = ExposureEngine.zoneReading(
+          meterAperture: meteredF,
+          cameraAperture: cameraF,
+          targetZone: targetZone.toDouble(),
+        );
+        final nd = reading.correctionStops < -0.15
+            ? CameraFilters.closestNd(reading.correctionStops)
+            : null;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _buildDropdown(
-                  "f/ EN CÁMARA",
-                  cameraF,
-                  CineData.apertures,
-                  (v) => setState(() => cameraF = v),
-                  isFstop: true,
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildManualInput(
-                  "LECTURA FOTÓMETRO",
-                  meteredF,
-                  (v) => setState(() => meteredF = v),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 40),
-          const Text(
-            "TOCA LA ZONA DESTINO",
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.white54,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 15),
-          SizedBox(
-            height: 80,
-            child: Row(
-              children: List.generate(11, (index) {
-                bool isCurrent = index == currentZone;
-                bool isTarget = index == targetZone;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => targetZone = index),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      decoration: BoxDecoration(
-                        color: zoneColors[index],
-                        border: Border.all(
-                          color: isTarget
-                              ? const Color(0xFFFFD700)
-                              : (isCurrent
-                                    ? Colors.redAccent
-                                    : Colors.transparent),
-                          width: isTarget || isCurrent ? 3 : 0,
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Center(
-                        child: Text(
-                          index == 5 ? "V" : "$index",
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: index < 5 ? Colors.white38 : Colors.black38,
-                          ),
-                        ),
-                      ),
+              _planContext(shot),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _dropdown(
+                      "f/ EN CÁMARA",
+                      cameraF,
+                      CineData.apertures,
+                      (v) => setState(() => cameraF = v),
+                      isFstop: true,
                     ),
                   ),
-                );
-              }),
-            ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _manualInput(
+                      "LECTURA FOTÓMETRO",
+                      meteredF,
+                      (v) => setState(() => meteredF = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 35),
+              const Text(
+                "TOCA LA ZONA DESTINO",
+                style: TextStyle(fontSize: 10, color: Colors.white54, letterSpacing: 1.2),
+              ),
+              const SizedBox(height: 12),
+              _zoneStrip(reading.zone),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _legendDot(Colors.redAccent, 'LA LECTURA CAE ACÁ'),
+                  const SizedBox(width: 16),
+                  _legendDot(OnSetColors.brand, 'ZONA DESTINO'),
+                ],
+              ),
+              const SizedBox(height: 30),
+              _resultCard(
+                stops: reading.correctionStops,
+                title: 'INSTRUCCIÓN PARA ILUMINACIÓN',
+                subtitle: _zoneSubtitle(reading, nd),
+              ),
+              if (nd != null) ...[
+                const SizedBox(height: 12),
+                _hint('O resolvelo con ${nd.name}'),
+              ],
+            ],
           ),
-          const SizedBox(height: 40),
-          _buildResultCard(correctionNeeded, "INSTRUCCIÓN PARA ILUMINACIÓN"),
-        ],
+        );
+      },
+    );
+  }
+
+  String _zoneSubtitle(ZoneReading reading, CameraFilter? nd) {
+    if (reading.isOnTarget) return 'La escena ya está en la zona elegida.';
+    if (reading.correctionStops > 0) {
+      return 'La escena está en zona ${reading.rawZone.toStringAsFixed(1)}: '
+          'hay que añadir luz o abrir diafragma.';
+    }
+    return 'La escena está en zona ${reading.rawZone.toStringAsFixed(1)}: '
+        'hay que quitar luz, cerrar diafragma${nd == null ? '' : ' o usar ND'}.';
+  }
+
+  Widget _zoneStrip(int currentZone) {
+    return SizedBox(
+      height: 80,
+      child: Row(
+        children: List.generate(11, (index) {
+          final isCurrent = index == currentZone;
+          final isTarget = index == targetZone;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => targetZone = index),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                decoration: BoxDecoration(
+                  color: zoneColors[index],
+                  border: Border.all(
+                    color: isTarget
+                        ? OnSetColors.brand
+                        : (isCurrent ? Colors.redAccent : Colors.transparent),
+                    width: isTarget || isCurrent ? 3 : 0,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Center(
+                  child: Text(
+                    index == 5 ? "V" : "$index",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: index < 5 ? Colors.white38 : Colors.black38,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -180,282 +224,628 @@ class _ZoneSystemScreenState extends State<ZoneSystemScreen> {
 // -----------------------------------------------------------------
 class InverseSquareTool extends StatefulWidget {
   const InverseSquareTool({super.key});
+
   @override
   State<InverseSquareTool> createState() => _ISTState();
 }
 
 class _ISTState extends State<InverseSquareTool> {
-  double d1 = 2, d2 = 4;
+  double d1 = 2;
+  double d2 = 4;
+  bool useFeet = false;
+
+  static const double _ftPerM = 3.280839895;
+  double _show(double metres) => useFeet ? metres * _ftPerM : metres;
+  double _store(double shown) => useFeet ? shown / _ftPerM : shown;
+
   @override
   Widget build(BuildContext context) {
-    double s = 2 * (log(max(d1 / max(d2, 0.1), 0.01)) / ln2);
-    double intensity = pow(min(d1 / max(d2, 0.1), 1.0), 2).toDouble();
+    final result = ExposureEngine.fallOff(referenceDistance: d1, newDistance: d2);
+    final isLoss = result.stops < 0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(25),
       child: Column(
         children: [
-          Container(
-            height: 120,
-            margin: const EdgeInsets.only(bottom: 30),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: LayoutBuilder(
-              builder: (ctx, box) {
-                double w = box.maxWidth;
-                double maxDist = max(d2, 5.0) * 1.15;
-                double subjectX = 40.0;
-                double lightX = subjectX + (d2 / maxDist) * (w - 60);
-                return Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    Positioned(
-                      top: 80,
-                      left: 10,
-                      right: 10,
-                      child: Container(height: 1, color: Colors.white10),
-                    ),
-                    if (lightX > subjectX)
-                      Positioned(
-                        left: subjectX + 15,
-                        top: 40,
-                        width: lightX - subjectX - 5,
-                        height: 40,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.yellowAccent.withValues(alpha: 0.0),
-                                Colors.yellowAccent.withValues(alpha: 0.6),
-                              ],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    Positioned(
-                      left: subjectX - 15,
-                      top: 45,
-                      child: Icon(
-                        Icons.person,
-                        size: 32,
-                        color: Colors.white.withValues(
-                          alpha: intensity.clamp(0.2, 1.0),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: lightX,
-                      top: 50,
-                      child: Icon(
-                        Icons.lightbulb,
-                        color: Colors.yellowAccent,
-                        size: 24,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+          _fallOffDiagram(result),
+          const SizedBox(height: 25),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _unitChip('METROS', !useFeet, () => setState(() => useFeet = false)),
+              const SizedBox(width: 10),
+              _unitChip('PIES', useFeet, () => setState(() => useFeet = true)),
+            ],
           ),
+          const SizedBox(height: 20),
           ProInput(
-            label: t('d1'),
-            value: d1,
-            min: 0.1,
-            max: 20,
-            unit: t('u_met'),
+            label: 'DISTANCIA DE REFERENCIA',
+            value: _show(d1),
+            min: useFeet ? 0.3 : 0.1,
+            max: useFeet ? 100 : 30,
+            unit: useFeet ? 'ft' : 'm',
             color: Colors.redAccent,
-            onChanged: (v) => setState(() => d1 = v),
+            onChanged: (v) => setState(() => d1 = _store(v)),
             isDecimal: true,
           ),
           ProInput(
-            label: t('d2'),
-            value: d2,
-            min: 0.1,
-            max: 20,
-            unit: t('u_met'),
+            label: 'NUEVA DISTANCIA',
+            value: _show(d2),
+            min: useFeet ? 0.3 : 0.1,
+            max: useFeet ? 100 : 30,
+            unit: useFeet ? 'ft' : 'm',
             color: Colors.redAccent,
-            onChanged: (v) => setState(() => d2 = v),
+            onChanged: (v) => setState(() => d2 = _store(v)),
             isDecimal: true,
           ),
-          const SizedBox(height: 40),
-          _buildResultCard(s, "PÉRDIDA / GANANCIA"),
+          const SizedBox(height: 25),
+          _resultCard(
+            stops: result.stops,
+            title: 'PÉRDIDA / GANANCIA',
+            subtitle: isLoss
+                ? 'La fuente pierde ${result.stops.abs().toStringAsFixed(1)} stops al alejarse. '
+                    'Abrí ese diafragma, subí la intensidad o acercá la fuente.'
+                : 'La fuente gana ${result.stops.toStringAsFixed(1)} stops al acercarse. '
+                    'Cerrá el diafragma, bajá la intensidad o alejá la fuente.',
+          ),
+          if (d2 < 1 || d1 < 1) ...[
+            const SizedBox(height: 12),
+            _hint('A menos de 1 m la ley inversa deja de ser exacta: '
+                'el tamaño de la fuente ya pesa.'),
+          ],
+          const SizedBox(height: 12),
+          _hint('Vale para fuentes puntuales. Con difusores grandes, '
+              'booklights o rebotes la caída es menor.'),
         ],
+      ),
+    );
+  }
+
+  Widget _fallOffDiagram(FallOffResult result) {
+    return Container(
+      height: 130,
+      margin: const EdgeInsets.only(bottom: 5),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: LayoutBuilder(
+        builder: (ctx, box) {
+          final w = box.maxWidth;
+          final maxDist = math.max(math.max(d1, d2), 5.0) * 1.15;
+          const subjectX = 40.0;
+          double xOf(double d) => subjectX + (d / maxDist) * (w - 80);
+          final refX = xOf(d1);
+          final lightX = xOf(d2);
+          final intensity = result.intensityRatio.clamp(0.15, 1.0);
+
+          return Stack(
+            children: [
+              Positioned(
+                top: 95,
+                left: 12,
+                right: 12,
+                child: Container(height: 1, color: Colors.white10),
+              ),
+              // Referencia: dónde estaba la fuente
+              Positioned(
+                left: refX - 1,
+                top: 60,
+                child: Container(width: 2, height: 36, color: Colors.white24),
+              ),
+              Positioned(
+                left: refX - 26,
+                top: 100,
+                width: 54,
+                child: Text(
+                  'd₁ ${_show(d1).toStringAsFixed(1)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 9, color: Colors.white38),
+                ),
+              ),
+              // Haz de luz: de la fuente al sujeto
+              if (lightX > subjectX + 20)
+                Positioned(
+                  left: subjectX + 10,
+                  top: 45,
+                  width: lightX - subjectX - 10,
+                  height: 34,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.yellowAccent.withValues(alpha: 0.05),
+                          Colors.yellowAccent.withValues(alpha: 0.55),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: subjectX - 16,
+                top: 42,
+                child: Icon(
+                  Icons.person,
+                  size: 32,
+                  color: Colors.white.withValues(alpha: intensity),
+                ),
+              ),
+              Positioned(
+                left: lightX - 10,
+                top: 48,
+                child: const Icon(Icons.lightbulb, color: Colors.yellowAccent, size: 22),
+              ),
+              Positioned(
+                left: lightX - 26,
+                top: 72,
+                width: 54,
+                child: Text(
+                  'd₂ ${_show(d2).toStringAsFixed(1)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 9, color: Colors.white54),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _unitChip(String label, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? OnSetColors.surfaceHigh : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: active ? Colors.white24 : Colors.white10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 1,
+            color: active ? Colors.white : Colors.white38,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
 }
 
 // -----------------------------------------------------------------
-// 3. COMPENSAR (REDISEÑO LIMPIO Y COHERENTE)
+// 3. COMPENSAR
 // -----------------------------------------------------------------
 class ExposureCompensationScreen extends StatefulWidget {
   const ExposureCompensationScreen({super.key});
+
   @override
   State<ExposureCompensationScreen> createState() =>
       _ExposureCompensationScreenState();
 }
 
-class _ExposureCompensationScreenState
-    extends State<ExposureCompensationScreen> {
-  double cameraF = 4.0; // f/ fijo por narrativa
-  double meteredF = 5.6;
-  double fps = 24, iso = 800;
-  double shutter = 180;
-  String selectedND = "Ninguno";
-  String selectedGel = "Ninguno";
+class _ExposureCompensationScreenState extends State<ExposureCompensationScreen> {
+  double desiredF = 4.0;
+  double meteredF = 4.0;
+  bool angleMode = true;
 
   @override
   Widget build(BuildContext context) {
-    // Matemáticas de compensación
-    double baseDiff = 2 * (log(meteredF / cameraF) / ln2);
-    double fpsStops = log(max(fps, 0.1) / 24) / ln2;
-    double shutterStops = log(shutter / 180) / ln2;
-    double isoStops = log(max(iso, 1) / 800) / ln2;
-    double filterStops = -CineData.cameraFilters[selectedND]!;
-    double gelStops = -CineData.lightGels[selectedGel]!;
+    return ListenableBuilder(
+      listenable: ShotState.instance,
+      builder: (context, _) {
+        final shot = ShotState.instance;
+        // La lectura del fotómetro se toma en la base: ISO base de la cámara,
+        // 24 fps y 180°.
+        final meter = MeterReading(
+          aperture: meteredF,
+          iso: shot.camera?.baseIso ?? 800,
+          fps: 24,
+          shutterAngle: 180,
+        );
+        final camera = shot.settingsFor(desiredF);
+        final result = ExposureEngine.compensate(meter: meter, camera: camera);
 
-    double totalCorrection =
-        -(baseDiff +
-            fpsStops +
-            shutterStops +
-            isoStops +
-            filterStops +
-            gelStops);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: _buildDropdown(
-                  "f/ DESEADO",
-                  cameraF,
-                  CineData.apertures,
-                  (v) => setState(() => cameraF = v),
-                  isFstop: true,
+              Row(
+                children: [
+                  Expanded(
+                    child: _dropdown(
+                      "f/ DESEADO",
+                      desiredF,
+                      CineData.apertures,
+                      (v) => setState(() => desiredF = v),
+                      isFstop: true,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _manualInput(
+                      "LECTURA (ISO BASE · 1/48)",
+                      meteredF,
+                      (v) => setState(() => meteredF = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 25),
+              _sectionLabel('AJUSTES DEL PLANO'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _dropdown(
+                      "ISO",
+                      shot.iso,
+                      CineData.isos,
+                      (v) => shot.setIso(v),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _dropdown(
+                      "FPS",
+                      shot.fps,
+                      CineData.fps,
+                      (v) => shot.setFps(v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              _shutterControl(shot),
+              const SizedBox(height: 15),
+              _stringDropdown(
+                "FILTRO ND",
+                shot.filter.name,
+                CameraFilters.all.map((f) => f.name).toList(),
+                (v) => shot.setFilter(CameraFilters.byName(v)),
+              ),
+              const SizedBox(height: 15),
+              _stringDropdown(
+                "GEL / DIFUSIÓN",
+                shot.gel?.label ?? 'Ninguno',
+                ['Ninguno', ...LightGels.all.map((g) => g.label)],
+                (v) => shot.setGel(
+                  v == 'Ninguno'
+                      ? null
+                      : LightGels.all.firstWhere((g) => g.label == v),
                 ),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildManualInput(
-                  "LECTURA FOTÓMETRO",
-                  meteredF,
-                  (v) => setState(() => meteredF = v),
-                ),
+              const SizedBox(height: 30),
+              _resultCard(
+                stops: result.stops,
+                title: 'CORRECCIÓN NECESARIA',
+                subtitle: _compensationSubtitle(result),
               ),
+              const SizedBox(height: 16),
+              _breakdown(result, shot),
+              const SizedBox(height: 16),
+              _recipes(result, shot),
             ],
           ),
-          const SizedBox(height: 30),
-          const Divider(color: Colors.white10),
-          const SizedBox(height: 20),
+        );
+      },
+    );
+  }
 
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown(
-                  "ISO",
-                  iso,
-                  CineData.isos,
-                  (v) => setState(() => iso = v),
+  String _compensationSubtitle(CompensationResult result) {
+    if (result.isBalanced) return 'La exposición coincide con la lectura.';
+    if (result.stops > 0) {
+      return 'Falta luz: abrí diafragma, subí ISO, alargá el obturador o sumá luz.';
+    }
+    return 'Sobra luz: cerrá diafragma, bajá ISO, acortá el obturador o poné ND.';
+  }
+
+  Widget _shutterControl(ShotState shot) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _sectionLabel('OBTURADOR'),
+            GestureDetector(
+              onTap: () => setState(() => angleMode = !angleMode),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: OnSetColors.surfaceHigh,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  angleMode ? 'ÁNGULO' : 'VELOCIDAD',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: OnSetColors.brand,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildDropdown(
-                  "FPS",
-                  fps,
-                  CineData.fps,
-                  (v) => setState(() => fps = v),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildDropdown(
-            "OBTURACIÓN (º)",
-            shutter,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (angleMode)
+          _dropdown(
+            "GRADOS",
+            shot.shutterAngle,
             CineData.shutterAngles,
-            (v) => setState(() => shutter = v),
+            (v) => shot.setShutterAngle(v),
+          )
+        else
+          _dropdown(
+            "1/x SEGUNDOS",
+            _nearestDenominator(shot.shutterDenominator),
+            _shutterSpeeds,
+            (v) => shot.setShutterDenominator(v),
+            prefix: '1/',
           ),
-          const SizedBox(height: 20),
-          _buildStringDropdown(
-            "FILTRO ND",
-            selectedND,
-            CineData.cameraFilters.keys.toList(),
-            (v) => setState(() => selectedND = v),
-          ),
-          const SizedBox(height: 20),
-          _buildStringDropdown(
-            "GEL / REJILLA",
-            selectedGel,
-            CineData.lightGels.keys.toList(),
-            (v) => setState(() => selectedGel = v),
-          ),
+      ],
+    );
+  }
 
-          const SizedBox(height: 40),
-          _buildResultCard(totalCorrection, "CORRECCIÓN DE LUZ"),
+  static const List<double> _shutterSpeeds = [
+    24, 25, 30, 48, 50, 60, 96, 100, 120, 125, 200, 250, 500, 1000, 2000, 4000,
+  ];
+
+  double _nearestDenominator(double d) {
+    var best = _shutterSpeeds.first;
+    var diff = double.infinity;
+    for (final s in _shutterSpeeds) {
+      final delta = (s - d).abs();
+      if (delta < diff) {
+        diff = delta;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  Widget _breakdown(CompensationResult result, ShotState shot) {
+    final baseIso = shot.camera?.baseIso ?? 800;
+    final isoDelta = math.log(shot.iso / baseIso) / math.ln2;
+    final shutterDelta = math.log(
+      (shot.shutterAngle / (360 * shot.fps)) / (180 / (360 * 24)),
+    ) / math.ln2;
+
+    // Cada fila es su aporte a la CORRECCIÓN (mismo signo que el resultado):
+    // si un ajuste suma luz, hay que corregir en contra.
+    final rows = <(String, double)>[
+      ('ISO ${shot.iso.toStringAsFixed(0)} vs base ${baseIso.toStringAsFixed(0)}', -isoDelta),
+      ('${shot.fps.toStringAsFixed(shot.fps % 1 == 0 ? 0 : 2)} fps a ${shot.shutterAngle.toStringAsFixed(0)}°', -shutterDelta),
+      if (shot.filterStops != 0) (shot.filter.name, shot.filterStops),
+      if (shot.gelStops != 0) (shot.gel!.label, shot.gelStops),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabel('DE DÓNDE SALE'),
+          const SizedBox(height: 10),
+          ...rows.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      r.$1,
+                      style: const TextStyle(fontSize: 11, color: Colors.white54),
+                    ),
+                  ),
+                  Text(
+                    '${r.$2 >= 0 ? '+' : ''}${r.$2.toStringAsFixed(1)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: r.$2.abs() < 0.05
+                          ? Colors.white38
+                          : (r.$2 > 0 ? OnSetColors.brand : OnSetColors.danger),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'TOTAL',
+                style: TextStyle(fontSize: 10, color: Colors.white38, letterSpacing: 1),
+              ),
+              Text(
+                '${rows.fold<double>(0, (a, b) => a + b.$2) >= 0 ? '+' : ''}'
+                '${rows.fold<double>(0, (a, b) => a + b.$2).toStringAsFixed(1)} stops',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Widget _recipes(CompensationResult result, ShotState shot) {
+    if (result.isBalanced) return const SizedBox.shrink();
+
+    final options = <(String, String)>[];
+    final stops = result.stops;
+
+    // 1. Diafragma
+    if (stops > 0) {
+      final f = _nearestAperture(desiredF / math.pow(2, stops / 2));
+      options.add(('Abrí a f/$f', 'DIAFRAGMA'));
+    } else {
+      final f = _nearestAperture(desiredF * math.pow(2, stops.abs() / 2));
+      options.add(('Cerrá a f/$f', 'DIAFRAGMA'));
+    }
+
+    // 2. ISO
+    final targetIso = shot.iso * math.pow(2, stops);
+    if (targetIso >= 50 && targetIso <= 25600) {
+      options.add(('ISO ${_nearestIso(targetIso).toStringAsFixed(0)}', 'SENSIBILIDAD'));
+    }
+
+    // 3. ND o obturador
+    if (stops < 0) {
+      final nd = CameraFilters.closestNd(stops);
+      if (nd != null) options.add((nd.name.split(' — ').first, 'FILTRO'));
+    } else {
+      final angle = (shot.shutterAngle * math.pow(2, stops)).clamp(11.25, 360.0);
+      options.add(('Obturador ${angle.toStringAsFixed(0)}°', 'OBTURADOR'));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('RECETARIO'),
+        const SizedBox(height: 10),
+        ...options.take(3).map(
+              (o) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: OnSetColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        o.$2,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: Colors.white38,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        o.$1,
+                        style: const TextStyle(fontSize: 13, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  double _nearestAperture(double v) {
+    var best = CineData.apertures.first;
+    var diff = double.infinity;
+    for (final a in CineData.apertures) {
+      final d = (a - v).abs();
+      if (d < diff) {
+        diff = d;
+        best = a;
+      }
+    }
+    return best;
+  }
+
+  double _nearestIso(double v) {
+    var best = CineData.isos.first;
+    var diff = double.infinity;
+    for (final i in CineData.isos) {
+      final d = (i - v).abs();
+      if (d < diff) {
+        diff = d;
+        best = i;
+      }
+    }
+    return best;
+  }
 }
 
 // -----------------------------------------------------------------
-// 4. FOTOMETRÍA UNIFICADA
+// 4. FOTOMETRÍA (LUX ⇄ F)
 // -----------------------------------------------------------------
 class LuxFStopUnifiedTool extends StatefulWidget {
   const LuxFStopUnifiedTool({super.key});
+
   @override
   State<LuxFStopUnifiedTool> createState() => _LFSUState();
 }
 
 class _LFSUState extends State<LuxFStopUnifiedTool> {
   bool isLuxToFStop = true;
-  double val = 1000.0, iso = 800;
+  double val = 1000.0;
+  double calibration = Photometry.incidentFlat;
 
   @override
   Widget build(BuildContext context) {
-    double res = isLuxToFStop
-        ? sqrt((max(val, 1) * max(iso, 1)) / (250 * 48))
-        : (pow(val, 2) * 250 * 48) / max(iso, 1);
+    return ListenableBuilder(
+      listenable: ShotState.instance,
+      builder: (context, _) {
+        final shot = ShotState.instance;
+        final result = isLuxToFStop
+            ? ExposureEngine.apertureForLux(
+                lux: val, iso: shot.iso, shutterTime: shot.shutterTime, calibration: calibration)
+            : ExposureEngine.luxForAperture(
+                aperture: val, iso: shot.iso, shutterTime: shot.shutterTime, calibration: calibration);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        children: [
-          _buildToggleButton(),
-          const SizedBox(height: 30),
-          ProInput(
-            label: isLuxToFStop ? "LUX" : "f/",
-            value: val,
-            min: 1,
-            max: 20000,
-            color: Colors.blueAccent,
-            onChanged: (v) => setState(() => val = v),
-            isDecimal: !isLuxToFStop,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            children: [
+              _toggle(),
+              const SizedBox(height: 12),
+              Text(
+                'Calculado con ${shot.summary}',
+                style: const TextStyle(fontSize: 10, color: Colors.white38),
+              ),
+              const SizedBox(height: 25),
+              ProInput(
+                label: isLuxToFStop ? "LUX" : "f/",
+                value: val,
+                min: isLuxToFStop ? 1 : 0.7,
+                max: isLuxToFStop ? 20000 : 45,
+                color: Colors.blueAccent,
+                onChanged: (v) => setState(() => val = v),
+                isDecimal: !isLuxToFStop,
+              ),
+              const SizedBox(height: 5),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _calibrationChip('PLANO (C=250)', Photometry.incidentFlat),
+                  const SizedBox(width: 8),
+                  _calibrationChip('DOMO (C=340)', Photometry.incidentDome),
+                ],
+              ),
+              const SizedBox(height: 30),
+              _result(result),
+            ],
           ),
-          ProInput(
-            label: "ISO",
-            value: iso,
-            min: 100,
-            max: 12800,
-            color: Colors.blueAccent,
-            onChanged: (v) => setState(() => iso = v),
-          ),
-          const SizedBox(height: 40),
-          _buildResultDisplay(res),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildToggleButton() {
+  Widget _toggle() {
     return GestureDetector(
       onTap: () => setState(() {
         isLuxToFStop = !isLuxToFStop;
@@ -464,7 +854,7 @@ class _LFSUState extends State<LuxFStopUnifiedTool> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: OnSetColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
         ),
@@ -493,12 +883,36 @@ class _LFSUState extends State<LuxFStopUnifiedTool> {
     );
   }
 
-  Widget _buildResultDisplay(double res) {
+  Widget _calibrationChip(String label, double value) {
+    final active = calibration == value;
+    return GestureDetector(
+      onTap: () => setState(() => calibration = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? OnSetColors.surfaceHigh : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: active ? Colors.white24 : Colors.white10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            letterSpacing: 1,
+            color: active ? Colors.white : Colors.white38,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _result(double result) {
+    final nearest = isLuxToFStop ? _nearestAperture(result) : null;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: OnSetColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.blueAccent),
       ),
@@ -506,106 +920,155 @@ class _LFSUState extends State<LuxFStopUnifiedTool> {
         children: [
           Text(
             isLuxToFStop ? "DIAFRAGMA" : "INTENSIDAD",
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.white38,
-              letterSpacing: 1.5,
-            ),
+            style: const TextStyle(fontSize: 10, color: Colors.white38, letterSpacing: 1.5),
           ),
           Text(
-            isLuxToFStop
-                ? "f / ${res.toStringAsFixed(1)}"
-                : "${res.toInt()} LX",
+            isLuxToFStop ? "f / ${result.toStringAsFixed(1)}" : "${result.toInt()} LX",
             style: const TextStyle(
               fontSize: 48,
               fontWeight: FontWeight.w300,
               color: Colors.blueAccent,
             ),
           ),
+          if (nearest != null)
+            Text(
+              'El diafragma más cercano es f/$nearest',
+              style: const TextStyle(fontSize: 11, color: Colors.white38),
+            ),
         ],
       ),
     );
   }
+
+  double _nearestAperture(double v) {
+    var best = CineData.apertures.first;
+    var diff = double.infinity;
+    for (final a in CineData.apertures) {
+      final d = (a - v).abs();
+      if (d < diff) {
+        diff = d;
+        best = a;
+      }
+    }
+    return best;
+  }
 }
 
 // -----------------------------------------------------------------
-// HELPERS COMUNES (ESTILO MAPA DE ZONAS)
+// HELPERS
 // -----------------------------------------------------------------
+Widget _planContext(ShotState shot) {
+  return Text(
+    'PLANO: ${shot.summary}',
+    style: const TextStyle(fontSize: 10, color: Colors.white38, letterSpacing: 1),
+  );
+}
 
-Widget _buildResultCard(double val, String label) {
-  Color accent = val == 0
-      ? Colors.green
-      : (val > 0 ? const Color(0xFFFFD700) : const Color(0xFFE57373));
+Widget _sectionLabel(String text) {
+  return Text(
+    text,
+    style: const TextStyle(
+      fontSize: 9,
+      color: Colors.white54,
+      fontWeight: FontWeight.bold,
+      letterSpacing: 1.2,
+    ),
+  );
+}
+
+Widget _hint(String text) {
+  return Text(
+    text,
+    style: const TextStyle(fontSize: 10, color: Colors.white30, height: 1.4),
+  );
+}
+
+Widget _legendDot(Color color, String label) {
+  return Row(
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Text(label, style: const TextStyle(fontSize: 9, color: Colors.white38)),
+    ],
+  );
+}
+
+Widget _resultCard({
+  required double stops,
+  required String title,
+  String? subtitle,
+}) {
+  final balanced = stops.abs() < 0.05;
+  final accent = balanced
+      ? OnSetColors.ok
+      : (stops > 0 ? OnSetColors.brand : OnSetColors.danger);
+
   return Container(
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
     decoration: BoxDecoration(
-      color: const Color(0xFF1E1E1E),
+      color: OnSetColors.surface,
       borderRadius: BorderRadius.circular(24),
       border: Border.all(color: accent, width: 1.5),
     ),
     child: Column(
       children: [
         Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.white38,
-            letterSpacing: 2,
-          ),
+          title,
+          style: const TextStyle(fontSize: 11, color: Colors.white38, letterSpacing: 2),
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: 12),
         Text(
-          val == 0
-              ? "OK"
-              : "${val > 0 ? '+' : ''}${val.toStringAsFixed(1)} STOPS",
-          style: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w300,
-            color: accent,
-          ),
+          balanced ? 'OK' : '${stops > 0 ? '+' : ''}${stops.toStringAsFixed(1)} STOPS',
+          style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, color: accent),
         ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: Colors.white54, height: 1.4),
+          ),
+        ],
       ],
     ),
   );
 }
 
-Widget _buildDropdown(
+Widget _dropdown(
   String label,
   double val,
   List<double> options,
   Function(double) onChanged, {
   bool isFstop = false,
+  String prefix = '',
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 9,
-          color: Colors.white54,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      _sectionLabel(label),
       const SizedBox(height: 8),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: OnSetColors.surface,
           borderRadius: BorderRadius.circular(8),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<double>(
-            value: val,
+            value: options.contains(val) ? val : options.first,
             isExpanded: true,
-            dropdownColor: const Color(0xFF2C2C2E),
+            dropdownColor: OnSetColors.surfaceHigh,
             items: options
                 .map(
                   (e) => DropdownMenuItem(
                     value: e,
                     child: Text(
-                      isFstop ? "f/$e" : e.toString(),
+                      isFstop ? "f/$e" : '$prefix${e.toString().replaceAll('.0', '')}',
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -619,7 +1082,7 @@ Widget _buildDropdown(
   );
 }
 
-Widget _buildStringDropdown(
+Widget _stringDropdown(
   String label,
   String val,
   List<String> options,
@@ -628,33 +1091,26 @@ Widget _buildStringDropdown(
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 9,
-          color: Colors.white54,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      _sectionLabel(label),
       const SizedBox(height: 8),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: OnSetColors.surface,
           borderRadius: BorderRadius.circular(8),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
-            value: val,
+            value: options.contains(val) ? val : options.first,
             isExpanded: true,
-            dropdownColor: const Color(0xFF2C2C2E),
+            dropdownColor: OnSetColors.surfaceHigh,
             items: options
                 .map(
                   (e) => DropdownMenuItem(
                     value: e,
                     child: Text(
                       e,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
                     ),
                   ),
                 )
@@ -667,40 +1123,75 @@ Widget _buildStringDropdown(
   );
 }
 
-Widget _buildManualInput(String label, double val, Function(double) onChanged) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 9,
-          color: Colors.white54,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      const SizedBox(height: 8),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: TextField(
-          controller: TextEditingController(text: val.toString()),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            prefixText: "f/ ",
-            prefixStyle: TextStyle(color: Colors.white54),
+Widget _manualInput(String label, double val, Function(double) onChanged) {
+  return _ManualField(label: label, value: val, onChanged: onChanged);
+}
+
+/// Campo numérico con su propio controlador: el anterior creaba uno nuevo en
+/// cada build y perdía el cursor mientras se escribía.
+class _ManualField extends StatefulWidget {
+  final String label;
+  final double value;
+  final Function(double) onChanged;
+
+  const _ManualField({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ManualField> createState() => _ManualFieldState();
+}
+
+class _ManualFieldState extends State<_ManualField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.value.toString());
+
+  @override
+  void didUpdateWidget(covariant _ManualField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        double.tryParse(_controller.text) != widget.value) {
+      _controller.text = widget.value.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel(widget.label),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: OnSetColors.surface,
+            borderRadius: BorderRadius.circular(8),
           ),
-          onSubmitted: (v) {
-            double? n = double.tryParse(v);
-            if (n != null) onChanged(n);
-          },
+          child: TextField(
+            controller: _controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              prefixText: "f/ ",
+              prefixStyle: TextStyle(color: Colors.white54),
+            ),
+            onSubmitted: (v) {
+              final n = double.tryParse(v);
+              if (n != null) widget.onChanged(n);
+            },
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }

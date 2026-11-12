@@ -5,6 +5,7 @@ import '../data/app_settings.dart';
 import '../data/camera_selection.dart';
 import '../data/catalogs/film_formats.dart';
 import '../data/catalogs/sensors.dart';
+import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 
@@ -160,6 +161,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
     final selection = _selection;
     if (selection == null) return;
     await AppSettings.saveCamera(selection);
+    ShotState.instance.setCamera(selection);
     if (!mounted) return;
     Navigator.pushReplacement(
       context,

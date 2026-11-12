@@ -117,12 +117,13 @@ void main() {
       expect(r.label, 'OK');
     });
 
-    test('cámara un paso más abierta que el fotómetro: hay que cerrar uno', () {
+    test('cámara un paso más abierta que el fotómetro: sobra luz (−1)', () {
       final r = ExposureEngine.compensate(
         meter: const MeterReading(aperture: 4),
         camera: const ExposureSettings(aperture: 2.8),
       );
-      expect(r.stops, closeTo(1, 0.03));
+      expect(r.stops, closeTo(-1, 0.03));
+      expect(r.label, startsWith('CIERRA'));
     });
 
     test('ISO 1600 pide cerrar un paso respecto de ISO 800', () {
@@ -131,7 +132,7 @@ void main() {
         camera: const ExposureSettings(aperture: 4, iso: 1600),
       );
       expect(r.requiredAperture, closeTo(5.657, 0.01));
-      expect(r.stops, closeTo(1, 1e-6));
+      expect(r.stops, closeTo(-1, 1e-6));
       expect(r.isoStops, closeTo(1, 1e-9));
     });
 
@@ -141,7 +142,7 @@ void main() {
         camera: const ExposureSettings(aperture: 4, filterStops: 1),
       );
       expect(r.requiredAperture, closeTo(2.828, 0.01));
-      expect(r.stops, closeTo(-1, 1e-6));
+      expect(r.stops, closeTo(1, 1e-6));
     });
 
     test('grabar a 48 fps con 180° pide abrir un paso', () {
@@ -149,7 +150,7 @@ void main() {
         meter: const MeterReading(aperture: 4),
         camera: const ExposureSettings(aperture: 4, fps: 48),
       );
-      expect(r.stops, closeTo(-1, 1e-6));
+      expect(r.stops, closeTo(1, 1e-6));
     });
 
     test('cerrar el obturador a 90° deja la cámara un paso corta', () {
@@ -157,7 +158,7 @@ void main() {
         meter: const MeterReading(aperture: 4),
         camera: const ExposureSettings(aperture: 4, shutterAngle: 90),
       );
-      expect(r.stops, closeTo(-1, 1e-6));
+      expect(r.stops, closeTo(1, 1e-6));
     });
 
     test('el desglose de variables explica el total', () {
@@ -175,7 +176,7 @@ void main() {
       expect(r.shutterStops, closeTo(-1, 1e-9));
       expect(r.filterStops, closeTo(-1, 1e-9));
       expect(r.gelStops, closeTo(-0.5, 1e-9));
-      expect(r.stops, closeTo(-1.5, 1e-6));
+      expect(r.stops, closeTo(1.5, 1e-6));
     });
 
     test('medir con el exposímetro a otro ISO no cambia la escena', () {

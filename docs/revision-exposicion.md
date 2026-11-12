@@ -120,6 +120,28 @@ pantalla usan signos opuestos y eso es una bomba de tiempo.
 
 ---
 
+## Estado de implementación (13/11/2026)
+
+Ya está hecho y con pruebas:
+
+- **Estado de plano compartido** (`lib/state/shot_state.dart`): ISO, fps, obturador, ND y
+  gelatina en un solo lugar; las cuatro pestañas lo leen y se actualizan entre sí.
+- **Signo único** en motor y pantalla: negativo = quitar luz, positivo = añadir luz.
+- **ISO base real** de la cámara elegida (VENICE 2 6K = 500, ALEXA 35 = 800, ALEXA 265 = 800
+  por falta de dato oficial).
+- **Obturador en ángulo y en velocidad 1/x** (recuperado).
+- **Desglose "de dónde sale"** con el mismo signo que el resultado y una fila TOTAL.
+- **Recetario** de tres alternativas: diafragma, ISO y ND/obturador.
+- **Zonas**: contexto del plano, defaults neutros (zona 5), sugerencia de ND y leyenda.
+- **Fall-Off**: gráfico con d₁ y d₂, metros y pies, "qué hacer" y advertencia de fuente grande.
+- **Fotometría**: obturador real del plano, C plano/domo seleccionable, diafragma más cercano.
+- Catálogo nuevo de filtros (ND 0.3–3.0, IRND, polarizadores, 85/80A, 81x, FLD) que reemplaza
+  los mapas viejos de `CineData`.
+
+Pendiente de decisión del usuario: anclas, si el recetario queda con este formato, y latitud.
+
+---
+
 ## Decisiones para el usuario
 
 1. ¿El resultado de Compensar debe ser un número o un recetario de tres opciones?

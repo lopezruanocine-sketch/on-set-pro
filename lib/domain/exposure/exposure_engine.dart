@@ -102,8 +102,9 @@ class MeterReading {
 
 /// Resultado del cálculo de compensación, con el desglose de cada variable.
 class CompensationResult {
-  /// Pasos totales a corregir. Positivo = cerrar diafragma o quitar luz;
-  /// negativo = abrir diafragma o añadir luz.
+  /// Pasos totales a corregir.
+  /// Positivo = **añadir luz** (abrir diafragma, subir ISO, alargar obturador).
+  /// Negativo = **quitar luz** (cerrar diafragma, bajar ISO, poner ND).
   final double stops;
 
   /// Diafragma que expondría correctamente con la configuración de cámara.
@@ -126,10 +127,10 @@ class CompensationResult {
 
   bool get isBalanced => stops.abs() < 0.05;
 
-  /// Etiqueta corta para la UI: "CIERRA 2.0", "ABRE 1.5" o "OK".
+  /// Etiqueta corta para la UI: "ABRE 2.0", "CIERRA 1.5" o "OK".
   String get label {
     if (isBalanced) return 'OK';
-    final action = stops > 0 ? 'CIERRA' : 'ABRE';
+    final action = stops > 0 ? 'ABRE' : 'CIERRA';
     return '$action ${stops.abs().toStringAsFixed(1)}';
   }
 }
@@ -187,6 +188,7 @@ class ExposureEngine {
       DMath.positive(meterAperture) / DMath.positive(cameraAperture),
     );
     final rawZone = 5 + stops;
+    // Mover la escena a una zona más alta exige añadir luz (positivo).
     final correction = targetZone - rawZone;
     return ZoneReading(
       rawZone: rawZone,
@@ -259,7 +261,8 @@ class ExposureEngine {
     required ExposureSettings camera,
   }) {
     final required = requiredAperture(meter: meter, camera: camera);
-    final stops = 2 * DMath.log2(required / DMath.positive(camera.aperture));
+    // Signo del proyecto: positivo = falta luz, negativo = sobra luz.
+    final stops = 2 * DMath.log2(DMath.positive(camera.aperture) / required);
 
     final isoStops = DMath.log2(DMath.positive(camera.iso) / meter.iso);
     final shutterStops =
