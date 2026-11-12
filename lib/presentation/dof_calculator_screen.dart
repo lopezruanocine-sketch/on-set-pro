@@ -1,232 +1,335 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'dart:math';
+
+import '../core/cine_data.dart';
 import '../core/localization.dart';
 import '../core/pro_input.dart';
+import '../domain/optics/optics_engine.dart';
+import '../state/shot_state.dart';
+import '../theme/app_theme.dart';
 
+/// Profundidad de campo con el sensor real de la cámara elegida.
 class DofCalculatorScreen extends StatefulWidget {
-  final double coc;
-  final String
-  sensorName; // Agregado para mantener compatibilidad con tu Dashboard
-
-  const DofCalculatorScreen({
-    super.key,
-    required this.coc,
-    required this.sensorName,
-  });
+  const DofCalculatorScreen({super.key});
 
   @override
   State<DofCalculatorScreen> createState() => _DofCalculatorScreenState();
 }
 
 class _DofCalculatorScreenState extends State<DofCalculatorScreen> {
-  double focal = 50, aperture = 2.8, dist = 2.0;
+  double focal = 50;
+  double aperture = 2.8;
+  double distanceM = 2.0;
+  bool useFeet = false;
+
+  static const double _ftPerM = 3.280839895;
 
   @override
   Widget build(BuildContext context) {
-    double fM = focal / 1000;
-    double h = (pow(fM, 2) / (max(aperture, 0.1) * (widget.coc / 1000))) + fM;
-    double near = (h * dist) / (h + (dist - fM));
-    double far = (h * dist) / max((h - (dist - fM)), 0.0001);
+    return ListenableBuilder(
+      listenable: ShotState.instance,
+      builder: (context, _) {
+        final selection = ShotState.instance.camera;
+        if (selection == null) {
+          return Scaffold(
+            backgroundColor: OnSetColors.background,
+            appBar: AppBar(title: Text(t('focus'))),
+            body: const Center(
+              child: Text(
+                'Elegí una cámara para calcular la profundidad de campo.',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212), // Fondo oscuro Kaan Cine
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
-        elevation: 0,
-        title: Text(
-          t('focus'),
+        final coc = selection.cocMm;
+        final dof = OpticsEngine.depthOfField(
+          focalMm: focal,
+          aperture: aperture,
+          subjectDistanceMm: distanceM * 1000,
+          cocMm: coc,
+        );
+
+        return Scaffold(
+          backgroundColor: OnSetColors.background,
+          appBar: AppBar(
+            backgroundColor: OnSetColors.background,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
+            title: Text(
+              t('focus'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(25),
+            child: Column(
+              children: [
+                Text(
+                  'PLANO: ${selection.label}',
+                  style: const TextStyle(fontSize: 10, color: Colors.white38, letterSpacing: 1),
+                ),
+                const SizedBox(height: 15),
+                _visualizer(dof),
+                const SizedBox(height: 25),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _unitChip('METROS', !useFeet, () => setState(() => useFeet = false)),
+                    const SizedBox(width: 8),
+                    _unitChip('PIES', useFeet, () => setState(() => useFeet = true)),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                ProInput(
+                  label: t('lens'),
+                  value: focal,
+                  min: 8,
+                  max: 300,
+                  unit: 'mm',
+                  color: OnSetColors.camera,
+                  onChanged: (v) => setState(() => focal = v),
+                ),
+                _aperturePicker(),
+                ProInput(
+                  label: t('dist'),
+                  value: useFeet ? distanceM * _ftPerM : distanceM,
+                  min: useFeet ? 1 : 0.3,
+                  max: useFeet ? 330 : 100,
+                  unit: useFeet ? 'ft' : 'm',
+                  color: OnSetColors.camera,
+                  onChanged: (v) => setState(
+                    () => distanceM = useFeet ? v / _ftPerM : v,
+                  ),
+                  isDecimal: true,
+                ),
+                const Divider(height: 50, color: Colors.white10),
+                _row(t('near'), _fmtMm(dof.nearLimitMm)),
+                _row(t('far'), dof.isFarInfinite ? 'INFINITO' : _fmtMm(dof.farLimitMm)),
+                _row(t('hyp'), _fmtMm(dof.hyperfocalMm), color: OnSetColors.brand),
+                const Divider(height: 50, color: Colors.white10),
+                _row('PROFUNDIDAD TOTAL',
+                    dof.isFarInfinite ? 'INFINITA' : _fmtMm(dof.totalDepthMm)),
+                _row('DELANTE DEL SUJETO', _fmtMm(dof.depthInFrontMm)),
+                _row(
+                  'DETRÁS DEL SUJETO',
+                  dof.isFarInfinite ? 'INFINITO' : _fmtMm(dof.depthBehindMm),
+                ),
+                const SizedBox(height: 30),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${t('coc')}: ${coc.toStringAsFixed(4)} mm · '
+                    '${selection.widthMm.toStringAsFixed(2)} × '
+                    '${selection.heightMm.toStringAsFixed(2)} mm '
+                    '(diagonal/1500)',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 10, color: Colors.white38),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _fmtMm(double mm) {
+    if (!mm.isFinite || mm > 1e7) return 'INFINITO';
+    final metres = mm / 1000;
+    return useFeet
+        ? '${(metres * _ftPerM).toStringAsFixed(2)} ft'
+        : '${metres.toStringAsFixed(2)} m';
+  }
+
+  Widget _aperturePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t('aper').toUpperCase(),
           style: const TextStyle(
-            color: Colors.white,
+            fontSize: 11,
+            color: Colors.white38,
+            letterSpacing: 1.2,
             fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          children: [
-            _buildVisualizer(near, far, dist, h),
-            const SizedBox(height: 20),
-            ProInput(
-              label: t('lens'),
-              value: focal,
-              min: 8,
-              max: 300,
-              unit: "mm",
-              color: const Color(0xFF64B5F6),
-              onChanged: (v) => setState(() => focal = v),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: OnSetColors.surface,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<double>(
+              value: CineData.apertures.contains(aperture) ? aperture : 2.8,
+              isExpanded: true,
+              dropdownColor: OnSetColors.surfaceHigh,
+              items: CineData.apertures
+                  .map((a) => DropdownMenuItem(
+                        value: a,
+                        child: Text('f/$a', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => aperture = v!),
             ),
-            ProInput(
-              label: t('aper'),
-              value: aperture,
-              min: 0.95,
-              max: 32,
-              unit: "f/",
-              color: const Color(0xFF64B5F6),
-              onChanged: (v) => setState(() => aperture = v),
-              isDecimal: true,
-            ),
-            ProInput(
-              label: t('dist'),
-              value: dist,
-              min: 0.3,
-              max: 100,
-              unit: "m",
-              color: const Color(0xFF64B5F6),
-              onChanged: (v) => setState(() => dist = v),
-              isDecimal: true,
-            ),
-            const Divider(height: 60, color: Colors.white10),
-            _row(t('near'), "${near.toStringAsFixed(2)} m"),
-            _row(
-              t('far'),
-              (far < 0 || far > 500)
-                  ? "INFINITO"
-                  : "${far.toStringAsFixed(2)} m",
-            ),
-            _row(
-              t('hyp'),
-              "${h.toStringAsFixed(2)} m",
-              c: const Color(0xFFFFD700),
-            ),
-            const SizedBox(height: 40),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                "${t('coc')}: ${widget.coc.toStringAsFixed(3)} mm",
-                style: const TextStyle(fontSize: 10, color: Colors.white38),
-              ),
-            ),
-          ],
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _unitChip(String label, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? OnSetColors.surfaceHigh : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: active ? Colors.white24 : Colors.white10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 1,
+            color: active ? Colors.white : Colors.white38,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildVisualizer(double near, double far, double dist, double h) {
-    double maxScale = max(h, dist) * 1.2;
-    double toPercent(double d) => (d / maxScale).clamp(0.0, 1.0);
-    bool inf = far > maxScale * 2 || far < 0;
+  Widget _visualizer(DepthOfField dof) {
+    // La escala se ajusta a la zona nítida, no a la hiperfocal: si no, con una
+    // hiperfocal de 40 m el sujeto a 2 m queda pegado al borde.
+    final span = dof.isFarInfinite
+        ? dof.subjectDistanceMm * 3
+        : math.max(dof.farLimitMm, dof.subjectDistanceMm) * 1.35;
+    final maxScale = math.max(span, dof.subjectDistanceMm * 1.2);
+    double toPercent(double mm) => (mm / maxScale).clamp(0.0, 1.0);
+    final inf = dof.isFarInfinite;
+    final hypVisible = dof.hyperfocalMm <= maxScale;
 
     return Container(
-      height: 100,
-      margin: const EdgeInsets.only(bottom: 20),
+      height: 110,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: OnSetColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: LayoutBuilder(
         builder: (ctx, constraints) {
-          double w = constraints.maxWidth;
-          double pNear = toPercent(near) * w;
-          double pDist = toPercent(dist) * w;
-          double pFar = inf ? w : toPercent(far) * w;
-          double pHyp = toPercent(h) * w;
+          final w = constraints.maxWidth;
+          final pNear = toPercent(dof.nearLimitMm) * w;
+          final pDist = toPercent(dof.subjectDistanceMm) * w;
+          final pFar = inf ? w : toPercent(dof.farLimitMm) * w;
+          final pHyp = toPercent(dof.hyperfocalMm) * w;
 
           return Stack(
-            alignment: Alignment.centerLeft,
             children: [
               Positioned(
-                top: 60,
+                top: 70,
                 left: 10,
                 right: 10,
                 child: Container(height: 1, color: Colors.white10),
               ),
               const Positioned(
-                left: 10,
-                top: 50,
+                left: 12,
+                top: 60,
                 child: Icon(Icons.videocam, color: Colors.white38, size: 16),
-              ),
-              const Positioned(
-                left: 10,
-                top: 75,
-                child: Text(
-                  "0m",
-                  style: TextStyle(fontSize: 8, color: Colors.white38),
-                ),
               ),
               Positioned(
                 left: pNear,
-                width: max(pFar - pNear, 2.0),
-                top: 55,
-                bottom: 35,
+                width: math.max(pFar - pNear, 2),
+                top: 58,
+                height: 26,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF64B5F6).withValues(alpha: 0.3),
+                    color: OnSetColors.camera.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.horizontal(
                       left: const Radius.circular(4),
                       right: inf ? Radius.zero : const Radius.circular(4),
                     ),
-                    border: Border.all(
-                      color: const Color(0xFF64B5F6).withValues(alpha: 0.5),
+                    border: Border.all(color: OnSetColors.camera.withValues(alpha: 0.5)),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: pDist - 5,
+                top: 64,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                ),
+              ),
+              Positioned(
+                left: pDist - 22,
+                top: 38,
+                width: 44,
+                child: Text(
+                  t('g_sub'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+              if (!hypVisible)
+                Positioned(
+                  right: 12,
+                  top: 30,
+                  child: Text(
+                    'H ${(dof.hyperfocalMm / 1000).toStringAsFixed(1)} m →',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      color: OnSetColors.brand,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: pDist - 6,
-                top: 56,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+              if (hypVisible) ...[
+                Positioned(
+                  left: pHyp,
+                  top: 50,
+                  height: 45,
+                  child: Container(width: 2, color: OnSetColors.brand),
                 ),
-              ),
-              Positioned(
-                left: pDist - 20,
-                top: 35,
-                child: SizedBox(
-                  width: 40,
+                Positioned(
+                  left: (pHyp - 32).clamp(0.0, w - 64),
+                  top: 28,
+                  width: 64,
                   child: Text(
-                    t('g_sub'),
+                    t('g_hyp'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 8,
+                      color: OnSetColors.brand,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              if (pHyp < w) ...[
-                Positioned(
-                  left: pHyp,
-                  top: 45,
-                  bottom: 25,
-                  child: Container(width: 2, color: const Color(0xFFFFD700)),
-                ),
-                Positioned(
-                  left: pHyp - 30,
-                  top: 25,
-                  child: SizedBox(
-                    width: 60,
-                    child: Text(
-                      t('g_hyp'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 8,
-                        color: Color(0xFFFFD700),
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
                   ),
                 ),
               ],
               Positioned(
-                left: pNear,
-                top: 75,
+                left: pNear + 4,
+                top: 90,
                 child: Text(
                   t('g_dof'),
-                  style: const TextStyle(fontSize: 8, color: Color(0xFF64B5F6)),
+                  style: const TextStyle(fontSize: 8, color: OnSetColors.camera),
                 ),
               ),
             ],
@@ -236,29 +339,27 @@ class _DofCalculatorScreenState extends State<DofCalculatorScreen> {
     );
   }
 
-  Widget _row(String l, String v, {Color c = Colors.white}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          l,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white54,
-            letterSpacing: 1,
+  Widget _row(String label, String value, {Color color = Colors.white}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Colors.white54, letterSpacing: 1),
           ),
-        ),
-        Text(
-          v,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w300,
-            color: c,
-            fontFamily: 'monospace',
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w300,
+              color: color,
+              fontFamily: 'monospace',
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

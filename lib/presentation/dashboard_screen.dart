@@ -127,8 +127,7 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        DofCalculatorScreen(coc: coc, sensorName: sensorName),
+                    builder: (context) => const DofCalculatorScreen(),
                   ),
                 );
               },
@@ -215,9 +214,7 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => OpticsScreen(
-                      sensorName: sensorName, // ¡Pasamos el sensor aquí!
-                    ),
+                    builder: (context) => const OpticsScreen(),
                   ),
                 );
               },

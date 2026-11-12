@@ -1,251 +1,266 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-class OpticsScreen extends StatefulWidget {
-  final String sensorName; // El sensor de origen (A-Cam)
+import 'package:flutter/material.dart';
 
-  const OpticsScreen({super.key, required this.sensorName});
+import '../data/catalogs/sensors.dart';
+import '../domain/optics/optics_engine.dart';
+import '../state/shot_state.dart';
+import '../theme/app_theme.dart';
+
+/// Campo de visión y equivalencia de lentes entre la cámara del plano y otra.
+class OpticsScreen extends StatefulWidget {
+  const OpticsScreen({super.key});
 
   @override
   State<OpticsScreen> createState() => _OpticsScreenState();
 }
 
 class _OpticsScreenState extends State<OpticsScreen> {
-  // --- ESTADO: LENTE Y DISTANCIA ---
-  double focalLengthMm = 50.0; // Lente base en A-Cam
-  double distanceMeters = 5.0; // Distancia al sujeto
-
-  // --- ESTADO: SENSORES ---
-  late String targetSensorName; // Sensor destino (B-Cam)
-
-  // Base de datos: Tamaños de Sensor (Ancho x Alto en mm)
-  final Map<String, Size> sensorSizes = {
-    'Full Frame (36x24)': const Size(36.0, 24.0),
-    'Súper 35 (24.9x18.7)': const Size(24.9, 18.7), // ARRI Alexa estándar
-    'APS-C (23.5x15.6)': const Size(23.5, 15.6), // Sony/Fuji crop
-    'Micro 4/3 (17.3x13)': const Size(17.3, 13.0),
-  };
+  double focalMm = 50;
+  double distanceM = 5;
+  String? targetCamera;
+  String? targetMode;
 
   @override
   void initState() {
     super.initState();
-    // Por defecto, el sensor destino es diferente al origen para que el cálculo tenga sentido
-    targetSensorName = sensorSizes.keys.firstWhere(
-      (name) => name != widget.sensorName,
-      orElse: () => sensorSizes.keys.first,
-    );
+    final source = ShotState.instance.camera;
+    // Buscamos una cámara con otro tamaño de sensor: comparar dos iguales no
+    // aporta nada al lens matching.
+    final sourceDiagonal = source == null
+        ? null
+        : OpticsEngine.diagonalMm(source.widthMm, source.heightMm);
+    String? fallback;
+    for (final camera in SensorCatalog.cameras) {
+      final mode = SensorCatalog.firstModeOf(camera);
+      if (mode == null) continue;
+      if (fallback == null &&
+          camera != '${source?.manufacturer} ${source?.camera}') {
+        fallback = camera;
+      }
+      final diagonal = OpticsEngine.diagonalMm(mode.widthMm, mode.heightMm);
+      if (sourceDiagonal == null ||
+          (diagonal - sourceDiagonal).abs() / sourceDiagonal > 0.1) {
+        targetCamera = camera;
+        break;
+      }
+    }
+    targetCamera ??= fallback ?? SensorCatalog.cameras.first;
+    targetMode = SensorCatalog.firstModeOf(targetCamera!)?.mode;
+  }
+
+  List<SensorMode> get _targetModes =>
+      targetCamera == null ? const [] : SensorCatalog.modesOf(targetCamera!);
+
+  SensorMode? get _target {
+    if (targetCamera == null || targetMode == null) return null;
+    return _targetModes.where((m) => m.mode == targetMode).firstOrNull;
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. MATEMÁTICAS DE ORIGEN (A-CAM)
-    Size sourceSize = sensorSizes[widget.sensorName] ?? const Size(36.0, 24.0);
-    double sensorDiagonal = math.sqrt(
-      sourceSize.width * sourceSize.width +
-          sourceSize.height * sourceSize.height,
+    final source = ShotState.instance.camera;
+    if (source == null) {
+      return Scaffold(
+        backgroundColor: OnSetColors.background,
+        appBar: AppBar(title: const Text('ÓPTICA / FOV')),
+        body: const Center(
+          child: Text(
+            'Elegí una cámara para calcular el campo de visión.',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
+    final sw = source.widthMm;
+    final sh = source.heightMm;
+    final fov = OpticsEngine.fieldOfView(
+      sensorWidthMm: sw,
+      sensorHeightMm: sh,
+      focalMm: focalMm,
+    );
+    final frameW = OpticsEngine.frameWidthAt(
+      sensorWidthMm: sw,
+      focalMm: focalMm,
+      distanceMm: distanceM,
+    );
+    final frameH = OpticsEngine.frameHeightAt(
+      sensorHeightMm: sh,
+      focalMm: focalMm,
+      distanceMm: distanceM,
     );
 
-    // Cálculo de FOV (Campo de Visión) en Grados
-    // Fórmula: 2 * arctan(sensorDimension / (2 * focalLength))
-    double fovHorizontalRad =
-        2 * math.atan(sourceSize.width / (2 * focalLengthMm));
-    double fovVerticalRad =
-        2 * math.atan(sourceSize.height / (2 * focalLengthMm));
-    double fovDiagonalDeg =
-        (2 * math.atan(sensorDiagonal / (2 * focalLengthMm))) * (180 / math.pi);
-
-    // Cálculo de Dimensiones del Encuadre a la distancia dada
-    // Fórmula: 2 * distancia * tan(fovRad / 2)
-    double frameWidthMeters =
-        2 * distanceMeters * math.tan(fovHorizontalRad / 2);
-    double frameHeightMeters =
-        2 * distanceMeters * math.tan(fovVerticalRad / 2);
-
-    // 2. MATEMÁTICAS DE DESTINO (B-CAM - LENS MATCHER)
-    Size targetSize = sensorSizes[targetSensorName]!;
-    double targetDiagonal = math.sqrt(
-      targetSize.width * targetSize.width +
-          targetSize.height * targetSize.height,
-    );
-    // Factor de recorte relativo entre los dos sensores
-    double cropFactorRelative = targetDiagonal / sensorDiagonal;
-    // Lente equivalente = Lente Origen * Factor Relativo
-    double equivalentFocalLength = focalLengthMm * cropFactorRelative;
+    final target = _target;
+    final crop = target == null
+        ? null
+        : OpticsEngine.cropFactor(
+            sourceWidthMm: sw,
+            sourceHeightMm: sh,
+            targetWidthMm: target.widthMm,
+            targetHeightMm: target.heightMm,
+          );
+    final equivalent = target == null
+        ? null
+        : OpticsEngine.equivalentFocal(
+            focalMm: focalMm,
+            sourceWidthMm: sw,
+            sourceHeightMm: sh,
+            targetWidthMm: target.widthMm,
+            targetHeightMm: target.heightMm,
+          );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: OnSetColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: OnSetColors.background,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          "ÓPTICA / FOV",
+          'ÓPTICA / FOV',
           style: TextStyle(
             color: Colors.white,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
             letterSpacing: 2.0,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- ILUSTRACIÓN DINÁMICA (FOV VISUALIZER) ---
             Container(
-              height: 200,
+              height: 190,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.black,
-                border: Border.all(color: Colors.white24, width: 1),
+                border: Border.all(color: Colors.white24),
               ),
               child: CustomPaint(
                 painter: FOVPainter(
-                  fovHorizontalRad: fovHorizontalRad,
-                  distanceMeters: distanceMeters,
-                  frameWidthMeters: frameWidthMeters,
+                  fovHorizontalRad: fov.horizontalDegrees * math.pi / 180,
+                  distanceMeters: distanceM,
+                  frameWidthMeters: frameW,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-
-            // --- RESULTADOS DEL ENCUADRE (A-CAM) ---
+            const SizedBox(height: 18),
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 color: Colors.black,
                 border: Border.all(color: Colors.white, width: 2),
               ),
               child: Column(
                 children: [
-                  const Text(
-                    "TAMAÑO DEL ENCUADRE (A la distancia)",
-                    style: TextStyle(
+                  Text(
+                    'ENCUADRE A ${distanceM.toStringAsFixed(1)} m · ${source.label}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
                       color: Colors.white54,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2.0,
                     ),
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 12),
                   Text(
-                    "${frameWidthMeters.toStringAsFixed(2)}m  x  ${frameHeightMeters.toStringAsFixed(2)}m",
+                    '${frameW.toStringAsFixed(2)} m  ×  ${frameH.toStringAsFixed(2)} m',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
+                      fontSize: 30,
                       fontWeight: FontWeight.w300,
                       fontFamily: 'monospace',
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 12),
                   Container(height: 1, color: Colors.white24),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildMiniStat(
-                        "FOV HORIZONTAL",
-                        "${(fovHorizontalRad * (180 / math.pi)).toStringAsFixed(1)}°",
-                      ),
-                      _buildMiniStat(
-                        "FOV VERTICAL",
-                        "${(fovVerticalRad * (180 / math.pi)).toStringAsFixed(1)}°",
-                      ),
-                      _buildMiniStat(
-                        "FOV DIAGONAL",
-                        "${fovDiagonalDeg.toStringAsFixed(1)}°",
-                      ),
+                      _miniStat('FOV H', '${fov.horizontalDegrees.toStringAsFixed(1)}°'),
+                      _miniStat('FOV V', '${fov.verticalDegrees.toStringAsFixed(1)}°'),
+                      _miniStat('FOV DIAG', '${fov.diagonalDegrees.toStringAsFixed(1)}°'),
                     ],
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 40),
-
-            // --- CONTROLES DE LENTE Y DISTANCIA ---
-            _buildSectionTitle(
-              "CONFIGURACIÓN DE A-CAM (${widget.sensorName.split(' ')[0].toUpperCase()})",
-            ),
+            const SizedBox(height: 30),
+            _sectionTitle('A-CAM · ${source.label.split(' · ').first}'),
             Row(
               children: [
-                Expanded(
-                  child: _buildInput(
-                    "LENTE (mm)",
-                    focalLengthMm,
-                    (v) => setState(() => focalLengthMm = v),
-                  ),
-                ),
+                Expanded(child: _numberInput('LENTE (mm)', focalMm, (v) => setState(() => focalMm = v))),
                 const SizedBox(width: 15),
                 Expanded(
-                  child: _buildInput(
-                    "DISTANCIA (m)",
-                    distanceMeters,
-                    (v) => setState(() => distanceMeters = v),
-                  ),
+                  child: _numberInput('DISTANCIA (m)', distanceM, (v) => setState(() => distanceM = v)),
                 ),
               ],
             ),
-
-            const SizedBox(height: 40),
-
-            // --- LENS MATCHER (EQUIVALENCIA B-CAM) ---
+            const SizedBox(height: 30),
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(color: const Color(0xFFFFD700), width: 2),
+                color: OnSetColors.surface,
+                border: Border.all(color: OnSetColors.brand, width: 1.5),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "LENS MATCHER (EQUIVALENCIA B-CAM)",
+                    'LENS MATCHER · B-CAM',
                     style: TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 12,
+                      color: OnSetColors.brand,
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2.0,
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _stringDropdown(
+                    'CÁMARA DESTINO',
+                    targetCamera,
+                    SensorCatalog.cameras,
+                    (v) => setState(() {
+                      targetCamera = v;
+                      targetMode = SensorCatalog.firstModeOf(v)?.mode;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  _stringDropdown(
+                    'MODO',
+                    targetMode,
+                    _targetModes.map((m) => m.mode).toList(),
+                    (v) => setState(() => targetMode = v),
+                  ),
                   const SizedBox(height: 20),
-                  _buildDropdown(
-                    "SENSOR DESTINO (B-CAM)",
-                    targetSensorName,
-                    sensorSizes.keys.toList(),
-                    (v) => setState(() => targetSensorName = v),
-                  ),
-                  const SizedBox(height: 25),
-                  const Text(
-                    "LENTE EQUIVALENTE NECESARIO",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
+                  if (equivalent != null) ...[
+                    const Text(
+                      'LENTE EQUIVALENTE EN B-CAM',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    "${equivalentFocalLength.toStringAsFixed(1)} mm",
-                    style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 48,
-                      fontWeight: FontWeight.w300,
-                      fontFamily: 'monospace',
+                    Text(
+                      '${equivalent.toStringAsFixed(1)} mm',
+                      style: const TextStyle(
+                        color: OnSetColors.brand,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w300,
+                        fontFamily: 'monospace',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Factor de Recorte Relativo: ${(1 / cropFactorRelative).toStringAsFixed(2)}x",
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      'Crop de B respecto de A: ${crop!.toStringAsFixed(2)}×',
+                      style: const TextStyle(fontSize: 10, color: Colors.white38),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -255,94 +270,50 @@ class _OpticsScreenState extends State<OpticsScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2.0,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMiniStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
+  Widget _sectionTitle(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 15),
+        child: Text(
+          title,
           style: const TextStyle(
+            fontSize: 11,
             color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w300,
-            fontFamily: 'monospace',
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2.0,
           ),
         ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white54,
-            fontSize: 8,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-        ),
-      ],
-    );
-  }
+      );
 
-  Widget _buildInput(String label, double val, Function(double) onChanged) {
-    TextEditingController ctrl = TextEditingController(
-      text: val.toInt().toString(),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.white54,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
-            border: Border.all(color: Colors.white24, width: 1),
-          ),
-          child: TextField(
-            controller: ctrl,
-            keyboardType: TextInputType.number,
+  Widget _miniStat(String label, String value) => Column(
+        children: [
+          Text(
+            value,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 19,
+              fontWeight: FontWeight.w300,
               fontFamily: 'monospace',
             ),
-            decoration: const InputDecoration(border: InputBorder.none),
-            onSubmitted: (v) {
-              double? n = double.tryParse(v);
-              if (n != null) onChanged(n);
-            },
           ),
-        ),
-      ],
-    );
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ],
+      );
+
+  Widget _numberInput(String label, double value, Function(double) onChanged) {
+    return _OpticsField(label: label, value: value, onChanged: onChanged);
   }
 
-  Widget _buildDropdown(
+  Widget _stringDropdown(
     String label,
-    String val,
+    String? value,
     List<String> options,
     Function(String) onChanged,
   ) {
@@ -352,38 +323,31 @@ class _OpticsScreenState extends State<OpticsScreen> {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 9,
             color: Colors.white54,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.0,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           decoration: BoxDecoration(
             color: Colors.black,
-            border: Border.all(color: Colors.white24, width: 1),
+            border: Border.all(color: Colors.white24),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: val,
+              value: options.contains(value) ? value : null,
               isExpanded: true,
-              dropdownColor: const Color(0xFF1E1E1E),
+              hint: const Text('Elegí', style: TextStyle(color: Colors.white38, fontSize: 13)),
+              dropdownColor: OnSetColors.surfaceHigh,
               icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
               items: options
-                  .map(
-                    (e) => DropdownMenuItem(
-                      value: e,
-                      child: Text(
-                        e,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  )
+                  .map((e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(e, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                      ))
                   .toList(),
               onChanged: (v) => onChanged(v!),
             ),
@@ -394,13 +358,85 @@ class _OpticsScreenState extends State<OpticsScreen> {
   }
 }
 
-// --- PINTOR DE LA ILUSTRACIÓN DINÁMICA (FOV) ---
+/// Campo numérico con controlador propio (el anterior se recreaba en cada build).
+class _OpticsField extends StatefulWidget {
+  final String label;
+  final double value;
+  final Function(double) onChanged;
+
+  const _OpticsField({required this.label, required this.value, required this.onChanged});
+
+  @override
+  State<_OpticsField> createState() => _OpticsFieldState();
+}
+
+class _OpticsFieldState extends State<_OpticsField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.value.toString());
+
+  @override
+  void didUpdateWidget(covariant _OpticsField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        double.tryParse(_controller.text) != widget.value) {
+      _controller.text = widget.value.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.white54,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: OnSetColors.surface,
+            border: Border.all(color: Colors.white24),
+          ),
+          child: TextField(
+            controller: _controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontFamily: 'monospace',
+            ),
+            decoration: const InputDecoration(border: InputBorder.none),
+            onSubmitted: (v) {
+              final n = double.tryParse(v);
+              if (n != null) widget.onChanged(n);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dibuja el cono de visión de la cámara y el ancho del encuadre.
 class FOVPainter extends CustomPainter {
   final double fovHorizontalRad;
   final double distanceMeters;
   final double frameWidthMeters;
 
-  FOVPainter({
+  const FOVPainter({
     required this.fovHorizontalRad,
     required this.distanceMeters,
     required this.frameWidthMeters,
@@ -408,89 +444,53 @@ class FOVPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+    final cameraX = 22.0;
+    final cameraY = size.height / 2;
+    final right = size.width - 12;
+    final usable = right - cameraX;
 
-    final fillPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.1)
-      ..style = PaintingStyle.fill;
+    final halfAngle = (fovHorizontalRad / 2).clamp(0.01, math.pi / 2 - 0.01);
+    final halfHeight = math.tan(halfAngle) * usable;
+    final topY = (cameraY - halfHeight).clamp(2.0, size.height);
+    final bottomY = (cameraY + halfHeight).clamp(0.0, size.height - 2);
 
-    final centerX = size.width / 2;
-    final bottomY = size.height - 20; // Posición de la cámara (abajo)
+    final cone = Path()
+      ..moveTo(cameraX, cameraY)
+      ..lineTo(right, topY)
+      ..lineTo(right, bottomY)
+      ..close();
 
-    // 1. Dibujar la Cámara (Icono esquemático)
-    final cameraPath = Path();
-    cameraPath.moveTo(centerX - 10, bottomY);
-    cameraPath.lineTo(centerX + 10, bottomY);
-    cameraPath.lineTo(centerX + 15, bottomY + 15);
-    cameraPath.lineTo(centerX - 15, bottomY + 15);
-    cameraPath.close();
-    canvas.drawPath(cameraPath, paint);
-    canvas.drawCircle(
-      Offset(centerX, bottomY),
-      3,
-      paint..style = PaintingStyle.fill,
-    ); // Lente
-
-    // 2. Calcular el Cono de Visión
-    // Usamos una escala visual: 1 metro real = X pixeles en pantalla
-    // Limitamos la distancia visual máxima para que no se salga del canvas
-    double maxVisualDistance = size.height - 40;
-    double visualScale = maxVisualDistance / math.max(distanceMeters, 1.0);
-    double visualDistance = distanceMeters * visualScale;
-
-    // El ancho visual del cono depende del ángulo FOV
-    double visualHalfWidth = visualDistance * math.tan(fovHorizontalRad / 2);
-    double topY = bottomY - visualDistance;
-
-    // 3. Dibujar el Cono de Visión (Triángulo)
-    final fovPath = Path();
-    fovPath.moveTo(centerX, bottomY); // Vértice en la cámara
-    fovPath.lineTo(
-      centerX - visualHalfWidth,
-      topY,
-    ); // Esquina superior izquierda
-    fovPath.lineTo(centerX + visualHalfWidth, topY); // Esquina superior derecha
-    fovPath.close();
-    canvas.drawPath(fovPath, paint);
-    canvas.drawPath(fovPath, fillPaint); // Relleno transparente
-
-    // 4. Dibujar el Encuadre (Rectángulo en el plano de enfoque)
-    canvas.drawLine(
-      Offset(centerX - visualHalfWidth, topY),
-      Offset(centerX + visualHalfWidth, topY),
-      paint..strokeWidth = 3,
+    canvas.drawPath(
+      cone,
+      Paint()..color = OnSetColors.brand.withValues(alpha: 0.10),
+    );
+    canvas.drawPath(
+      cone,
+      Paint()
+        ..color = OnSetColors.brand.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
     );
 
-    // 5. Dibujar un Sujeto Esquemático (Referencia de escala)
-    // La altura del sujeto es proporcional al ancho del encuadre
-    double subjectHeight =
-        (1.7 / frameWidthMeters) * (visualHalfWidth * 2); // Sujeto de 1.7m
-    if (subjectHeight > 0 && subjectHeight < visualDistance) {
-      double subjectY =
-          topY + (subjectHeight / 2); // Pies del sujeto en el plano
-      canvas.drawCircle(
-        Offset(centerX, subjectY - subjectHeight + (subjectHeight / 6)),
-        subjectHeight / 6,
-        paint
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      ); // Cabeza
-      canvas.drawLine(
-        Offset(centerX, subjectY - subjectHeight + (subjectHeight / 3)),
-        Offset(centerX, subjectY),
-        paint,
-      ); // Cuerpo
-      canvas.drawLine(
-        Offset(centerX - subjectHeight / 4, subjectY - subjectHeight / 2),
-        Offset(centerX + subjectHeight / 4, subjectY - subjectHeight / 2),
-        paint,
-      ); // Brazos
-    }
+    canvas.drawCircle(
+      Offset(cameraX, cameraY),
+      4,
+      Paint()..color = Colors.white,
+    );
+
+    final label = TextPainter(
+      text: TextSpan(
+        text: '${frameWidthMeters.toStringAsFixed(1)} m a ${distanceMeters.toStringAsFixed(1)} m',
+        style: const TextStyle(color: Colors.white70, fontSize: 10),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    label.paint(canvas, Offset(right - label.width - 4, size.height - 18));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant FOVPainter old) =>
+      old.fovHorizontalRad != fovHorizontalRad ||
+      old.distanceMeters != distanceMeters ||
+      old.frameWidthMeters != frameWidthMeters;
 }
