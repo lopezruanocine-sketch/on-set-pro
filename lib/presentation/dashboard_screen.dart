@@ -172,8 +172,7 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        StorageScreen(isFilm: isFilm, sensorName: sensorName),
+                    builder: (context) => const StorageScreen(),
                   ),
                 );
               },
