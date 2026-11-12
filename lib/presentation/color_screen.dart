@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/catalogs/light_gels.dart';
+import '../domain/color/color_engine.dart';
+import '../domain/color/gel_advisor.dart';
+import '../theme/app_theme.dart';
+
+/// Temperatura y gelatinas: cuánto corrimiento hace falta y con qué gel.
 class ColorScreen extends StatefulWidget {
   const ColorScreen({super.key});
 
@@ -8,349 +14,317 @@ class ColorScreen extends StatefulWidget {
 }
 
 class _ColorScreenState extends State<ColorScreen> {
-  // --- ESTADO: TEMPERATURA (KELVIN) ---
-  double targetK = 5600.0; // Cámara
-  double sourceK = 3200.0; // Foco / Luz
-
-  // --- ESTADO: TINTE (VERDE / MAGENTA) ---
-  String observedTint =
-      'NORMAL'; // NORMAL, GREEN_HIGH, GREEN_LOW, MAGENTA_LOW, MAGENTA_HIGH
-
-  // Base de datos: Geles de Temperatura (Lee/Rosco)
-  final List<Map<String, dynamic>> tempGels = [
-    {
-      'name': 'Full CTO',
-      'mired': 159,
-      'color': const Color(0xFFFF9800),
-      'desc': 'Convierte 6500K a 3200K',
-    },
-    {
-      'name': '1/2 CTO',
-      'mired': 81,
-      'color': const Color(0xFFFFB74D),
-      'desc': 'Convierte 5600K a 3800K',
-    },
-    {
-      'name': '1/4 CTO',
-      'mired': 42,
-      'color': const Color(0xFFFFE0B2),
-      'desc': 'Calienta ligeramente',
-    },
-    {
-      'name': '1/8 CTO',
-      'mired': 20,
-      'color': const Color(0xFFFFF3E0),
-      'desc': 'Toque cálido sutil',
-    },
-    {
-      'name': '1/8 CTB',
-      'mired': -12,
-      'color': const Color(0xFFE3F2FD),
-      'desc': 'Toque frío sutil',
-    },
-    {
-      'name': '1/4 CTB',
-      'mired': -35,
-      'color': const Color(0xFF90CAF9),
-      'desc': 'Enfría ligeramente',
-    },
-    {
-      'name': '1/2 CTB',
-      'mired': -68,
-      'color': const Color(0xFF42A5F5),
-      'desc': 'Convierte 3200K a 4300K',
-    },
-    {
-      'name': 'Full CTB',
-      'mired': -137,
-      'color': const Color(0xFF2196F3),
-      'desc': 'Convierte 3200K a 5600K',
-    },
-  ];
-
-  // Base de datos: Geles de Tinte (Minus/Plus Green)
-  final Map<String, Map<String, dynamic>> tintGels = {
-    'GREEN_HIGH': {
-      'name': 'Full Minus Green (Magenta)',
-      'color': const Color(0xFFE040FB),
-    },
-    'GREEN_LOW': {'name': '1/4 Minus Green', 'color': const Color(0xFFEA80FC)},
-    'NORMAL': {'name': 'NINGUNO', 'color': Colors.white54},
-    'MAGENTA_LOW': {'name': '1/4 Plus Green', 'color': const Color(0xFF69F0AE)},
-    'MAGENTA_HIGH': {
-      'name': 'Full Plus Green (Verde)',
-      'color': const Color(0xFF00E676),
-    },
-  };
+  double sourceK = 3200;
+  double targetK = 5600;
+  String tint = 'normal';
 
   @override
   Widget build(BuildContext context) {
-    // 1. MATEMÁTICAS MIRED
-    double targetMired = 1000000 / targetK;
-    double sourceMired = 1000000 / sourceK;
-    double miredShift = targetMired - sourceMired;
-
-    // 2. BÚSQUEDA DEL GEL IDEAL
-    Map<String, dynamic> recommendedTempGel = {
-      'name': 'NINGUNO (Balanceado)',
-      'mired': 0,
-      'color': Colors.white,
-    };
-    double smallestDiff = double.infinity;
-
-    if (miredShift.abs() > 10) {
-      // El ojo no nota menos de 10 Mireds
-      for (var gel in tempGels) {
-        double diff = (gel['mired'] - miredShift).abs();
-        if (diff < smallestDiff) {
-          smallestDiff = diff;
-          recommendedTempGel = gel;
-        }
-      }
-    }
-
-    // 3. COLORES DE INTERFAZ
-    Color shiftBorderColor = miredShift > 10
-        ? const Color(0xFF2196F3)
-        : miredShift < -10
-        ? const Color(0xFFFF9800)
-        : const Color(0xFF4CAF50);
-    Map<String, dynamic> recommendedTintGel = tintGels[observedTint]!;
+    final shift = ColorEngine.shiftTo(sourceKelvin: sourceK, targetKelvin: targetK);
+    final options = GelAdvisor.recommend(
+      sourceKelvin: sourceK,
+      targetKelvin: targetK,
+      limit: 3,
+    );
+    final best = options.isEmpty ? null : options.first;
+    final tintGel = _tintGel();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: OnSetColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: OnSetColors.background,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          "COLOR Y GELES",
+          'COLOR Y GELES',
           style: TextStyle(
             color: Colors.white,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
             letterSpacing: 2.0,
+            fontSize: 14,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- PANEL DE RESULTADOS (DIAGNÓSTICO DEL GAFFER) ---
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border.all(color: shiftBorderColor, width: 2),
-                borderRadius: BorderRadius.zero,
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    "DESFASE TÉRMICO (MIREDS)",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.0,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    miredShift > 0
-                        ? "+${miredShift.toInt()}"
-                        : miredShift.toInt().toString(),
-                    style: TextStyle(
-                      color: shiftBorderColor,
-                      fontSize: 48,
-                      fontWeight: FontWeight.w300,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(height: 1, color: Colors.white24),
-                  const SizedBox(height: 20),
-
-                  // RESULTADO: TEMPERATURA
-                  const Text(
-                    "GEL DE TEMPERATURA RECOMENDADO",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    recommendedTempGel['name'].toUpperCase(),
-                    style: TextStyle(
-                      color: recommendedTempGel['color'],
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // RESULTADO: TINTE
-                  if (observedTint != 'NORMAL') ...[
-                    const Text(
-                      "GEL DE CORRECCIÓN DE TINTE",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      recommendedTintGel['name'].toUpperCase(),
-                      style: TextStyle(
-                        color: recommendedTintGel['color'],
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ],
-              ),
+            _resultCard(shift, best),
+            const SizedBox(height: 30),
+            _sectionTitle('1. BALANCE DE TEMPERATURA'),
+            _presetRow('FUENTE', [
+              ('TUNGSTENO 3200', sourceK == 3200, () => setState(() => sourceK = 3200)),
+              ('DIURNO 5600', sourceK == 5600, () => setState(() => sourceK = 5600)),
+              ('HMI 6000', sourceK == 6000, () => setState(() => sourceK = 6000)),
+              ('LED 6500', sourceK == 6500, () => setState(() => sourceK = 6500)),
+            ]),
+            _kelvinSlider('FOCO EN SET (ORIGEN)', sourceK, (v) => setState(() => sourceK = v), OnSetColors.power),
+            const SizedBox(height: 10),
+            const Text(
+              'CÁMARA (OBJETIVO)',
+              style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold),
             ),
-
-            const SizedBox(height: 40),
-
-            // --- CONTROLES DE TEMPERATURA KELVIN ---
-            _buildSectionTitle("1. BALANCE DE TEMPERATURA (KELVIN)"),
-            _buildSliderCard(
-              "CÁMARA (OBJETIVO)",
-              targetK,
-              (v) => setState(() => targetK = v),
-              Colors.white,
-            ),
-            const SizedBox(height: 15),
-            _buildSliderCard(
-              "FOCO EN SET (ORIGEN)",
-              sourceK,
-              (v) => setState(() => sourceK = v),
-              const Color(0xFFFFD700),
-            ),
-
-            const SizedBox(height: 40),
-
-            // --- CONTROLES DE TINTE VERDE/MAGENTA ---
-            _buildSectionTitle("2. CORRECCIÓN DE TINTE (FLUORESCENTES/LED)"),
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(color: Colors.white24, width: 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "¿CÓMO SE VE LA LUZ EN EL MONITOR?",
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.white54,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: observedTint,
-                      isExpanded: true,
-                      dropdownColor: Colors.black,
-                      icon: const Icon(
-                        Icons.arrow_drop_down,
-                        color: Colors.white,
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'GREEN_HIGH',
-                          child: Text(
-                            "Muy Verde (Tubo viejo/HMI)",
-                            style: TextStyle(color: Color(0xFF00E676)),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'GREEN_LOW',
-                          child: Text(
-                            "Ligeramente Verde",
-                            style: TextStyle(color: Color(0xFF69F0AE)),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'NORMAL',
-                          child: Text(
-                            "Normal (Limpia)",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'MAGENTA_LOW',
-                          child: Text(
-                            "Ligeramente Magenta",
-                            style: TextStyle(color: Color(0xFFEA80FC)),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'MAGENTA_HIGH',
-                          child: Text(
-                            "Muy Magenta (LED barato)",
-                            style: TextStyle(color: Color(0xFFE040FB)),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => observedTint = v!),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
+            _presetRow('', [
+              ('3200', targetK == 3200, () => setState(() => targetK = 3200)),
+              ('4300', targetK == 4300, () => setState(() => targetK = 4300)),
+              ('5600', targetK == 5600, () => setState(() => targetK = 5600)),
+            ]),
+            _kelvinSlider('OBJETIVO', targetK, (v) => setState(() => targetK = v), Colors.white),
+            const SizedBox(height: 25),
+            _sectionTitle('2. CORRECCIÓN DE TINTE'),
+            _tintSelector(),
+            if (tintGel != null) ...[
+              const SizedBox(height: 12),
+              _tintResult(tintGel),
+            ],
+            if (best != null) ...[
+              const SizedBox(height: 25),
+              _alternatives(options.skip(1).toList()),
+            ],
           ],
         ),
       ),
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
+  Widget _resultCard(ColorShift shift, GelMatch? best) {
+    final mired = shift.shiftMired;
+    final color = mired.abs() < 3
+        ? OnSetColors.ok
+        : (mired > 0 ? OnSetColors.power : Colors.blueAccent);
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2.0,
-        ),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'DESFASE TÉRMICO (MIREDS)',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.0,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            mired.abs() < 3 ? '0' : '${mired > 0 ? '+' : ''}${mired.toInt()}',
+            style: TextStyle(
+              color: color,
+              fontSize: 48,
+              fontWeight: FontWeight.w300,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            mired.abs() < 3
+                ? 'La fuente ya coincide con la cámara.'
+                : (mired > 0
+                    ? 'La fuente es más fría: hay que calentarla.'
+                    : 'La fuente es más cálida: hay que enfriarla.'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+          const SizedBox(height: 18),
+          Container(height: 1, color: Colors.white24),
+          const SizedBox(height: 16),
+          const Text(
+            'GEL RECOMENDADA',
+            style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            best == null ? 'NINGUNA' : best.gel.label.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: best == null ? Colors.white : OnSetColors.brand,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          if (best != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Queda en ${best.resultingKelvin.toStringAsFixed(0)} K · '
+              'error ${best.errorMired.toStringAsFixed(0)} mireds · '
+              'pierde ${best.gel.stops.toStringAsFixed(2)} stops',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildSliderCard(
-    String label,
-    double val,
-    Function(double) onChanged,
-    Color accentColor,
-  ) {
+  Widget _alternatives(List<GelMatch> options) {
+    if (options.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('OTRAS OPCIONES'),
+        ...options.map(
+          (o) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: OnSetColors.surface,
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      o.gel.label,
+                      style: const TextStyle(fontSize: 12, color: Colors.white),
+                    ),
+                  ),
+                  Text(
+                    '${o.resultingKelvin.toStringAsFixed(0)} K',
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _tintSelector() {
+    const options = [
+      ('greenStrong', 'MUY VERDE'),
+      ('greenLight', 'ALGO VERDE'),
+      ('normal', 'LIMPIA'),
+      ('magentaLight', 'ALGO MAGENTA'),
+      ('magentaStrong', 'MUY MAGENTA'),
+    ];
     return Container(
-      padding: const EdgeInsets.only(top: 20, bottom: 5, left: 15, right: 15),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        border: Border.all(color: Colors.white24, width: 1),
+      height: 44,
+      decoration: BoxDecoration(border: Border.all(color: Colors.white24)),
+      child: Row(
+        children: options.map((o) {
+          final selected = tint == o.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => tint = o.$1),
+              child: Container(
+                color: selected ? OnSetColors.surfaceHigh : Colors.transparent,
+                alignment: Alignment.center,
+                child: Text(
+                  o.$2,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: selected ? Colors.white : Colors.white38,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
+    );
+  }
+
+  Widget _tintResult(LightGel gel) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        border: Border.all(color: OnSetColors.power),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'PARA EL TINTE',
+            style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold),
+          ),
+          const Spacer(),
+          Text(
+            gel.label,
+            style: const TextStyle(fontSize: 13, color: OnSetColors.power, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${gel.stops.toStringAsFixed(2)} st',
+            style: const TextStyle(fontSize: 10, color: Colors.white38),
+          ),
+        ],
+      ),
+    );
+  }
+
+  LightGel? _tintGel() {
+    switch (tint) {
+      case 'greenStrong':
+        return LightGels.byCode('Lee', '247');
+      case 'greenLight':
+        return LightGels.byCode('Lee', '249');
+      case 'magentaLight':
+        return LightGels.byCode('Lee', '246');
+      case 'magentaStrong':
+        return LightGels.byCode('Lee', '244');
+      default:
+        return null;
+    }
+  }
+
+  Widget _presetRow(String label, List<(String, bool, VoidCallback)> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label.isNotEmpty) ...[
+          Text(
+            label,
+            style: const TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: items
+              .map((i) => Expanded(
+                    child: GestureDetector(
+                      onTap: i.$3,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: i.$2 ? OnSetColors.surfaceHigh : Colors.transparent,
+                          border: Border.all(color: i.$2 ? Colors.white24 : Colors.white10),
+                        ),
+                        child: Text(
+                          i.$1,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: i.$2 ? Colors.white : Colors.white38,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _kelvinSlider(String label, double value, Function(double) onChanged, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -359,42 +333,38 @@ class _ColorScreenState extends State<ColorScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.white54,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
+                style: const TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold),
               ),
               Text(
-                "${val.toInt()} K",
-                style: TextStyle(
-                  fontSize: 18,
-                  color: accentColor,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                ),
+                '${value.toStringAsFixed(0)} K',
+                style: TextStyle(fontSize: 14, color: color, fontFamily: 'monospace'),
               ),
             ],
           ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: accentColor,
-              inactiveTrackColor: Colors.white10,
-              thumbColor: accentColor,
-              overlayColor: accentColor.withValues(alpha: 0.2),
-              trackHeight: 2.0,
-            ),
-            child: Slider(
-              value: val,
-              min: 2000,
-              max: 10000,
-              divisions: 160, // Saltos de 50K para más precisión
-              onChanged: onChanged,
-            ),
+          Slider(
+            value: value.clamp(2000, 10000),
+            min: 2000,
+            max: 10000,
+            divisions: 80,
+            activeColor: color,
+            inactiveColor: Colors.white10,
+            onChanged: onChanged,
           ),
         ],
       ),
     );
   }
+
+  Widget _sectionTitle(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+      );
 }

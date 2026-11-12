@@ -74,4 +74,16 @@ class LightGels {
 
   /// Todas las gelatinas que corrigen temperatura (tienen mired).
   static List<LightGel> get withMired => all.where((g) => g.mired != null).toList();
+
+  /// Busca una gelatina por marca y código (ej. `Lee 204`).
+  static LightGel? byCode(String brand, String code) {
+    for (final g in all) {
+      if (g.brand == brand && g.code == code) return g;
+    }
+    return null;
+  }
+
+  /// Gelatinas de una familia (verde, magenta, difusión…).
+  static List<LightGel> ofFamily(GelFamily family) =>
+      all.where((g) => g.family == family).toList();
 }

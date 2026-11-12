@@ -16,8 +16,9 @@ Verificado el 13/11/2026: el proyecto compila sin errores ni avisos (`flutter an
 y tiene **80 pruebas automáticas en verde**. El código está bajo git: cualquier cambio se puede
 revertir. Pendiente de instalación para compilar en teléfono: CocoaPods (iPhone) y SDK de Android.
 
-**Núcleo de cálculo (Fase 1, en curso).** Las fórmulas ya no viven en las pantallas: están en
-`lib/domain/`, en Dart puro y con tests.
+**Núcleo de cálculo (Fase 1, terminada).** Las fórmulas no viven en las pantallas: están en
+`lib/domain/`, en Dart puro y con tests. Las siete pantallas ya usan ese núcleo y los catálogos
+verificados (cámaras, formatos fílmicos, filtros, gelatinas, códecs y cables).
 
 | Motor | Qué resuelve | Pruebas |
 |---|---|---|
@@ -27,6 +28,9 @@ revertir. Pendiente de instalación para compilar en teléfono: CocoaPods (iPhon
 | `color` | Mireds + asesor de gelatinas Lee/Rosco | 7 |
 | `power` | Ohm, caída de tensión, ampacidad con derating, generadores | 14 |
 | `storage` | Códecs (77 tasas), duración y copia DIT | 11 |
+
+**Pantallas reconectadas:** Exposición, Óptica, Eléctrico, Storage, Color y Flicker.
+Cada una tiene su documento de revisión en `docs/revision-*.md`.
 
 Catálogos: gelatinas (31), cables H07RN-F y SOOW, códecs (77 tasas), **cámaras (25 modelos,
 82 modos de grabación** con su área de imagen real) y **formatos fílmicos (12)**. Cada dato
