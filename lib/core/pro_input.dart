@@ -25,7 +25,10 @@ class ProInput extends StatelessWidget {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(label.toUpperCase(), style: const TextStyle(fontSize: 11, color: Colors.white38, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
           GestureDetector(
-            onTap: () => Future.microtask(() => _showManualInput(context)),
+            onTap: () => Future.microtask(() {
+              if (!context.mounted) return;
+              _showManualInput(context);
+            }),
             child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
               Text(isDecimal ? value.toStringAsFixed(1) : value.toInt().toString(), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w300, color: color, fontFamily: 'monospace')),
               const SizedBox(width: 4), 

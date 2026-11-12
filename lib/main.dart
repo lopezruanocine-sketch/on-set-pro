@@ -1,46 +1,37 @@
 import 'package:flutter/material.dart';
+
+import 'core/localization.dart';
+import 'data/app_settings.dart';
 import 'presentation/camera_setup_screen.dart';
+import 'presentation/dashboard_screen.dart';
+import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const OnSetPro());
+  final boot = await AppSettings.load();
+  lang = boot.language;
+  runApp(OnSetPro(initialCamera: boot.camera));
 }
 
-class OnSetPro extends StatefulWidget {
-  const OnSetPro({super.key});
+class OnSetPro extends StatelessWidget {
+  final SavedCamera? initialCamera;
 
-  @override
-  State<OnSetPro> createState() => _OnSetProState();
-}
-
-class _OnSetProState extends State<OnSetPro> {
-  void updateLanguage() {
-    setState(() {});
-  }
+  const OnSetPro({super.key, this.initialCamera});
 
   @override
   Widget build(BuildContext context) {
+    final camera = initialCamera;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'On Set Pro',
-      theme: ThemeData.dark().copyWith(
-        // Restaurado al negro de Kaan Cine
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: const Color(0xFFFFD700),
-        cardColor: const Color(0xFF1E1E1E),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF121212),
-          elevation: 0,
-          titleTextStyle: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      // Lanzamos la pantalla de la cámara
-      home: CameraSetupScreen(onLangChange: updateLanguage),
+      theme: OnSetTheme.dark(),
+      home: camera == null
+          ? const CameraSetupScreen()
+          : DashboardScreen(
+              sensorName: camera.format,
+              isFilm: camera.isFilm,
+              coc: camera.coc,
+            ),
     );
   }
 }

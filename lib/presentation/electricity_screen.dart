@@ -421,7 +421,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
             color: const Color(0xFF1E1E1E),
             border: Border.all(
               color: highlight
-                  ? const Color(0xFFFFD700).withOpacity(0.5)
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.5)
                   : Colors.white24,
             ),
           ),

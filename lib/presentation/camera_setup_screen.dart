@@ -1,34 +1,41 @@
 import 'package:flutter/material.dart';
-import '../core/localization.dart'; // ¡Volvemos a conectar los idiomas!
-import 'dashboard_screen.dart'; 
-
-final Map<String, double> digitalSensors = {
-  "Medio Formato (GFX)": 0.050, "Full Frame / VV": 0.030, "Super 35mm": 0.025,
-  "APS-C (Sony/Fuji)": 0.020, "APS-C (Canon)": 0.019, "MFT (GH6/BMPCC)": 0.015,
-  "1-inch Sensor": 0.011, "1/1.7-inch": 0.007, "1/2.3-inch": 0.006, "1/3-inch": 0.005,
-};
-
-final Map<String, double> filmFormats = {
-  "65mm 5-Perf": 0.050, "35mm 4-Perf": 0.025, "35mm 3-Perf": 0.025, "35mm 2-Perf": 0.025,
-  "16mm Super": 0.013, "16mm Standard": 0.013, "9.5mm": 0.010, "Super 8mm": 0.006, "Standard 8mm": 0.005,
-};
+import '../core/localization.dart';
+import '../data/app_settings.dart';
+import '../data/camera_formats.dart';
+import '../theme/app_theme.dart';
+import 'dashboard_screen.dart';
 
 class CameraSetupScreen extends StatefulWidget {
-  final VoidCallback onLangChange;
-  const CameraSetupScreen({super.key, required this.onLangChange});
+  final VoidCallback? onLangChange;
+  final String? initialMode;
+  final String? initialFormat;
+
+  const CameraSetupScreen({
+    super.key,
+    this.onLangChange,
+    this.initialMode,
+    this.initialFormat,
+  });
   
   @override 
   State<CameraSetupScreen> createState() => _CameraSetupScreenState();
 }
 
 class _CameraSetupScreenState extends State<CameraSetupScreen> {
-  String? mode; 
+  String? mode;
   String? selectedFormat;
+
+  @override
+  void initState() {
+    super.initState();
+    mode = widget.initialMode;
+    selectedFormat = widget.initialFormat;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: OnSetColors.background,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(30),
@@ -73,7 +80,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
+                    color: OnSetColors.surface,
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: DropdownButtonHideUnderline(
@@ -82,8 +89,8 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                       isExpanded: true,
                       hint: Text(t('sel_fmt'), style: const TextStyle(color: Colors.white38)),
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white24),
-                      dropdownColor: const Color(0xFF2C2C2E),
-                      items: (mode == 'film' ? filmFormats.keys : digitalSensors.keys)
+                      dropdownColor: OnSetColors.surfaceHigh,
+                      items: CameraFormats.namesFor(mode!)
                           .map((e) => DropdownMenuItem(
                                 value: e,
                                 child: Text(e, style: const TextStyle(fontSize: 13, color: Colors.white)),
@@ -96,7 +103,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                 const SizedBox(height: 30),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD700),
+                    backgroundColor: OnSetColors.brand,
                     foregroundColor: Colors.black,
                     elevation: 0,
                     minimumSize: const Size(double.infinity, 55),
@@ -104,16 +111,20 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                   ),
                   onPressed: selectedFormat == null
                       ? null
-                      : () {
-                          Navigator.push(
+                      : () async {
+                          final camera = SavedCamera(
+                            mode: mode!,
+                            format: selectedFormat!,
+                          );
+                          await AppSettings.saveCamera(camera);
+                          if (!context.mounted) return;
+                          Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
                               builder: (c) => DashboardScreen(
-                                sensorName: selectedFormat!,
-                                isFilm: mode == 'film',
-                                coc: mode == 'film'
-                                    ? filmFormats[selectedFormat]!
-                                    : digitalSensors[selectedFormat]!,
+                                sensorName: camera.format,
+                                isFilm: camera.isFilm,
+                                coc: camera.coc,
                               ),
                             ),
                           );
@@ -131,8 +142,9 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
   Widget _flagBtn(String flag, String code) {
     return GestureDetector(
       onTap: () {
-        lang = code; // Cambiamos el idioma global
-        widget.onLangChange(); // Le avisamos al main.dart que recargue TODA la app
+        setState(() => lang = code);
+        AppSettings.saveLanguage(code);
+        widget.onLangChange?.call();
       },
       child: Opacity(
         opacity: lang == code ? 1.0 : 0.3,

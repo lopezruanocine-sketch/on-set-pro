@@ -158,13 +158,13 @@ class _DofCalculatorScreenState extends State<DofCalculatorScreen> {
                 bottom: 35,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF64B5F6).withOpacity(0.3),
+                    color: const Color(0xFF64B5F6).withValues(alpha: 0.3),
                     borderRadius: BorderRadius.horizontal(
                       left: const Radius.circular(4),
                       right: inf ? Radius.zero : const Radius.circular(4),
                     ),
                     border: Border.all(
-                      color: const Color(0xFF64B5F6).withOpacity(0.5),
+                      color: const Color(0xFF64B5F6).withValues(alpha: 0.5),
                     ),
                   ),
                 ),

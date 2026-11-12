@@ -10,6 +10,15 @@
 
 ---
 
+## ESTADO TÉCNICO HOY
+
+Verificado el 12/11/2026: el proyecto compila sin errores ni avisos (`flutter analyze` limpio),
+tiene 4 pruebas automáticas en verde y versión web que funciona. El código está bajo git:
+cualquier cambio se puede revertir. Pendiente de instalación para compilar en teléfono:
+CocoaPods (iPhone) y el SDK de Android.
+
+---
+
 ## 1. QUÉ ES
 
 On Set Pro es una herramienta de toma de decisiones para el set. No es una calculadora suelta:
@@ -54,11 +63,25 @@ números grandes y finos (48–54 px), etiquetas chicas en mayúscula con letter
 esquinas rectas en las tarjetas del menú. Referencia estética declarada: **Kaan Cine**.
 
 **Lo que decía la biblia original (GDD v3.0):** fondo `#0D0D0D`, acento naranja,
-grid de tarjetas con **color por departamento** (azul cámara/óptica, rojo imagen/expo,
-amarillo electricidad, verde data, naranja utilidades).
+grid de tarjetas con **color por departamento**.
 
-> `A DEFINIR` — ¿Volvemos al código de colores por departamento o sostenemos el dorado único?
-> Es la decisión visual más importante que queda abierta.
+**DECIDIDO (12/11/2026):** se usan los dos sistemas a la vez, cada uno con su función.
+
+- El **dorado** (`#FFD700`) es la marca: acción principal, botón de ingreso, pestaña activa,
+  resultado, zona destino.
+- El **color de departamento** identifica a qué área pertenece cada herramienta: barra lateral
+  e ícono de cada tarjeta del menú.
+
+| Departamento | Color | Módulos |
+|---|---|---|
+| Cámara / Óptica | Azul `#4E9AF1` | Profundidad de campo · Óptica / FOV |
+| Imagen / Exposición | Rojo `#E57373` | Sistema de zonas / Expo · Flicker |
+| Electricidad / Iluminación | Ámbar `#FFB300` | Electricidad y energía · Color y geles |
+| Data / Producción | Verde `#66BB6A` | Data y almacenamiento / Chasis y metraje |
+| Utilidades | Naranja `#FF8A50` | (calculadora, claqueta, charts, linterna) |
+
+> Los colores viven en `lib/theme/app_theme.dart` (`OnSetColors`). Ninguna pantalla nueva
+> debe escribir un hex a mano: se usa el token.
 
 ## 6. MAPA DE LA APP
 
@@ -82,7 +105,8 @@ Inicio (elegir fílmico o digital + formato)
 
 - Elegir **Fílmico** o **Digital**, después el formato. Eso define el **CoC** que usa todo el resto de la app.
 - Idiomas: español, inglés, portugués.
-- **Pendiente:** que la elección se recuerde entre sesiones (hoy se pierde al cerrar).
+- **Se recuerda entre sesiones:** la próxima vez que se abre la app entra directo al menú con
+  la cámara elegida. Para cambiarla, el ícono de cámara arriba a la derecha del menú.
 
 CoC por formato (mm):
 
@@ -186,19 +210,23 @@ Estas cinco herramientas estaban en el GDD v3.0 y nunca se construyeron. Todas v
 
 ## 9. DECISIONES PENDIENTES
 
-1. Identidad visual: ¿dorado único o colores por departamento?
+1. ~~Identidad visual: ¿dorado único o colores por departamento?~~ **Cerrada el 12/11/2026
+   (ver §5): dorado de marca + color por departamento.**
 2. ¿La app se publica y se cobra? Si sí: ¿pago único, suscripción o gratis con premium?
-3. ¿La cámara elegida y los ajustes se recuerdan entre sesiones? (recomendado: sí)
+3. ~~¿La cámara elegida se recuerda entre sesiones?~~ **Cerrada: sí, ya funciona (§7.1).**
 4. ¿"Anclas" y "Recetario" entran en la próxima versión de Exposición?
 5. ¿Los módulos de Utilidades (claqueta, calculadora, charts, linterna) entran antes o después de la publicación?
 
 ## 10. PRÓXIMOS PASOS
 
-1. Cerrar esta biblia v0 con tus correcciones.
-2. Orden técnico: fórmulas afuera de las pantallas, con tests; persistencia; tema y componentes comunes.
-3. Exposición v2 completa, sin perder el modo 1/x.
-4. Utilidades faltantes.
-5. Versión web para escritorio, íconos, publicación.
+- ~~Fase 0 — rescate y orden~~ **hecha el 12/11/2026**: backup, git, biblia, código muerto
+  eliminado, cámara persistente, colores por departamento, analizador en cero y las primeras
+  pruebas automáticas.
+- **Fase 1 (siguiente)** — núcleo confiable: fórmulas afuera de las pantallas, con tests contra
+  valores de referencia; tema y componentes compartidos; revisar el CoC de 35mm 2-perf/3-perf.
+- Fase 2 — Exposición v2 completa, sin perder el modo 1/x, con Anclas y Recetario.
+- Fase 3 — Utilidades faltantes.
+- Fase 4 — Versión web para escritorio, íconos, publicación.
 
 ## 11. HISTORIAL DE DOCUMENTOS
 
@@ -208,3 +236,4 @@ Estas cinco herramientas estaban en el GDD v3.0 y nunca se construyeron. Todas v
 | `OnSetPro.pdf` (v5.2) | 24 feb 2026 | One-sheet técnico y comercial + fórmulas + bibliografía |
 | Conversación con Gemini (58 pág.) | hasta nov 2026 | Desarrollo del código, pantalla por pantalla |
 | Este documento (v0) | 12 nov 2026 | Consolidación: qué existe hoy y qué falta |
+| Biblia v1 | 12 nov 2026 | Fase 0 cerrada: decisión de color, persistencia, limpieza técnica |

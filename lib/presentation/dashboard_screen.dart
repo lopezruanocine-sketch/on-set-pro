@@ -6,6 +6,8 @@ import 'storage_screen.dart'; // Import agregado correctamente
 import 'flicker_screen.dart';
 import 'color_screen.dart';
 import 'optics_screen.dart';
+import '../theme/app_theme.dart';
+import 'camera_setup_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   final String sensorName;
@@ -22,9 +24,9 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212), // Fondo principal oscuro
+      backgroundColor: OnSetColors.background, // Fondo principal oscuro
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), // AppBar oscuro
+        backgroundColor: OnSetColors.background, // AppBar oscuro
         elevation: 0,
         title: const Text(
           'ON SET PRO',
@@ -36,6 +38,23 @@ class DashboardScreen extends StatelessWidget {
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            tooltip: 'CAMBIAR CÁMARA',
+            icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CameraSetupScreen(
+                    initialMode: isFilm ? 'film' : 'digital',
+                    initialFormat: sensorName,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       // Cambiado a SingleChildScrollView para evitar errores de desbordamiento
       body: SingleChildScrollView(
@@ -108,6 +127,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'PROFUNDIDAD DE CAMPO',
               icon: Icons.center_focus_strong_outlined,
+              accent: OnSetColors.camera,
               onTap: () {
                 Navigator.push(
                   context,
@@ -123,6 +143,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'SISTEMA DE ZONAS / EXPO',
               icon: Icons.exposure_outlined,
+              accent: OnSetColors.image,
               onTap: () {
                 Navigator.push(
                   context,
@@ -135,6 +156,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'ELECTRICIDAD Y ENERGÍA',
               icon: Icons.bolt_outlined,
+              accent: OnSetColors.power,
               onTap: () {
                 Navigator.push(
                   context,
@@ -151,6 +173,7 @@ class DashboardScreen extends StatelessWidget {
               icon: isFilm
                   ? Icons.movie_creation_outlined
                   : Icons.sd_storage_outlined,
+              accent: OnSetColors.data,
               onTap: () {
                 Navigator.push(
                   context,
@@ -166,6 +189,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'FLICKER Y PARPADEO',
               icon: Icons.light_mode_outlined,
+              accent: OnSetColors.image,
               onTap: () {
                 Navigator.push(
                   context,
@@ -179,6 +203,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'COLOR Y GELES (MIREDS)',
               icon: Icons.palette_outlined,
+              accent: OnSetColors.power,
               onTap: () {
                 Navigator.push(
                   context,
@@ -190,6 +215,7 @@ class DashboardScreen extends StatelessWidget {
             _buildDashboardCard(
               title: 'ÓPTICA / FOV (LENS MATCHER)',
               icon: Icons.camera_outlined,
+              accent: OnSetColors.camera,
               onTap: () {
                 Navigator.push(
                   context,
@@ -211,6 +237,7 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildDashboardCard({
     required String title,
     required IconData icon,
+    required Color accent,
     required VoidCallback onTap,
   }) {
     return Padding(
@@ -219,14 +246,19 @@ class DashboardScreen extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E), // Gris oscuro característico
+            color: OnSetColors.surface, // Gris oscuro característico
             borderRadius: BorderRadius.zero,
-            border: Border.all(color: Colors.white24, width: 1), // Borde sutil
+            border: Border(
+              left: BorderSide(color: accent, width: 4),
+              top: BorderSide(color: Colors.white12, width: 1),
+              right: BorderSide(color: Colors.white12, width: 1),
+              bottom: BorderSide(color: Colors.white12, width: 1),
+            ),
           ),
           padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white, size: 28),
+              Icon(icon, color: accent, size: 28),
               const SizedBox(width: 20),
               Expanded(
                 child: Text(
