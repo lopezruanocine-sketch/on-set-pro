@@ -5,12 +5,17 @@ import '../core/pro_input.dart';
 import '../core/cine_data.dart';
 
 class ExpoFotoTabs extends StatelessWidget {
-  const ExpoFotoTabs({super.key});
+  /// Pestaña que se abre primero (0 = zonas, 1 = fall-off, 2 = compensar,
+  /// 3 = fotometría).
+  final int initialTab;
+
+  const ExpoFotoTabs({super.key, this.initialTab = 0});
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 4,
+      initialIndex: initialTab.clamp(0, 3),
       child: Scaffold(
         backgroundColor: const Color(0xFF121212),
         appBar: AppBar(
