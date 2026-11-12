@@ -209,4 +209,29 @@ void main() {
       expect(delta, closeTo(-1, 0.03));
     });
   });
+
+  group('desglose por variable', () {
+    test('ISO 1600 y 48 fps con ND 1 y gel 0.5 sobre la base', () {
+      final b = ExposureEngine.breakdown(
+        camera: const ExposureSettings(
+          aperture: 4,
+          iso: 1600,
+          fps: 48,
+          filterStops: 1,
+          gelStops: 0.5,
+        ),
+      );
+      expect(b.isoStops, closeTo(1, 1e-9));
+      expect(b.shutterStops, closeTo(-1, 1e-9));
+      expect(b.filterStops, closeTo(-1, 1e-9));
+      expect(b.gelStops, closeTo(-0.5, 1e-9));
+      expect(b.total, closeTo(-1.5, 1e-9));
+      expect(b.totalCorrection, closeTo(1.5, 1e-9));
+    });
+
+    test('la configuración de referencia no aporta nada', () {
+      final b = ExposureEngine.breakdown(camera: ExposureSettings.reference);
+      expect(b.total, closeTo(0, 1e-9));
+    });
+  });
 }

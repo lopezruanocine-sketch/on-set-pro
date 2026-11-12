@@ -169,6 +169,34 @@ class FallOffResult {
   bool get isLoss => stops < 0;
 }
 
+/// Desglose de la luz que aporta (o quita) cada variable del plano,
+/// respecto de una configuración de referencia.
+///
+/// Positivo = esa variable suma luz respecto de la base.
+class LightBreakdown {
+  final double isoStops;
+  final double shutterStops;
+  final double filterStops;
+  final double gelStops;
+
+  const LightBreakdown({
+    required this.isoStops,
+    required this.shutterStops,
+    required this.filterStops,
+    required this.gelStops,
+  });
+
+  double get total => isoStops + shutterStops + filterStops + gelStops;
+
+  /// Lo que cada variable aporta a la CORRECCIÓN (signo opuesto a la luz).
+  double get isoCorrection => -isoStops;
+  double get shutterCorrection => -shutterStops;
+  double get filterCorrection => -filterStops;
+  double get gelCorrection => -gelStops;
+
+  double get totalCorrection => -total;
+}
+
 /// Motor de exposición. Todas las fórmulas viven acá, fuera de la interfaz.
 class ExposureEngine {
   ExposureEngine._();
@@ -275,6 +303,21 @@ class ExposureEngine {
       shutterStops: shutterStops,
       filterStops: -camera.filterStops,
       gelStops: -camera.gelStops,
+    );
+  }
+
+  /// Desglose por variable respecto de la configuración de referencia.
+  static LightBreakdown breakdown({
+    required ExposureSettings camera,
+    ExposureSettings reference = ExposureSettings.reference,
+  }) {
+    return LightBreakdown(
+      isoStops: DMath.log2(DMath.positive(camera.iso) / reference.iso),
+      shutterStops: DMath.log2(
+        DMath.positive(camera.shutterTime) / DMath.positive(reference.shutterTime),
+      ),
+      filterStops: -(camera.filterStops - reference.filterStops),
+      gelStops: -(camera.gelStops - reference.gelStops),
     );
   }
 

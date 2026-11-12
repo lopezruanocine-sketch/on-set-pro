@@ -8,6 +8,7 @@ import '../core/pro_input.dart';
 import '../data/catalogs/camera_filters.dart';
 import '../data/catalogs/light_gels.dart';
 import '../domain/exposure/exposure_engine.dart';
+import '../domain/exposure/exposure_recipes.dart';
 import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 
@@ -614,18 +615,20 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
 
   Widget _breakdown(CompensationResult result, ShotState shot) {
     final baseIso = shot.camera?.baseIso ?? 800;
-    final isoDelta = math.log(shot.iso / baseIso) / math.ln2;
-    final shutterDelta = math.log(
-      (shot.shutterAngle / (360 * shot.fps)) / (180 / (360 * 24)),
-    ) / math.ln2;
-
     // Cada fila es su aporte a la CORRECCIÓN (mismo signo que el resultado):
     // si un ajuste suma luz, hay que corregir en contra.
+    final breakdown = ExposureEngine.breakdown(camera: shot.settingsFor(desiredF));
     final rows = <(String, double)>[
-      ('ISO ${shot.iso.toStringAsFixed(0)} vs base ${baseIso.toStringAsFixed(0)}', -isoDelta),
-      ('${shot.fps.toStringAsFixed(shot.fps % 1 == 0 ? 0 : 2)} fps a ${shot.shutterAngle.toStringAsFixed(0)}°', -shutterDelta),
-      if (shot.filterStops != 0) (shot.filter.name, shot.filterStops),
-      if (shot.gelStops != 0) (shot.gel!.label, shot.gelStops),
+      (
+        'ISO ${shot.iso.toStringAsFixed(0)} vs base ${baseIso.toStringAsFixed(0)}',
+        breakdown.isoCorrection,
+      ),
+      (
+        '${shot.fps.toStringAsFixed(shot.fps % 1 == 0 ? 0 : 2)} fps a ${shot.shutterAngle.toStringAsFixed(0)}°',
+        breakdown.shutterCorrection,
+      ),
+      if (shot.filterStops != 0) (shot.filter.name, breakdown.filterCorrection),
+      if (shot.gelStops != 0) (shot.gel!.label, breakdown.gelCorrection),
     ];
 
     return Container(
@@ -687,97 +690,76 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
   Widget _recipes(CompensationResult result, ShotState shot) {
     if (result.isBalanced) return const SizedBox.shrink();
 
-    final options = <(String, String)>[];
-    final stops = result.stops;
-
-    // 1. Diafragma
-    if (stops > 0) {
-      final f = _nearestAperture(desiredF / math.pow(2, stops / 2));
-      options.add(('Abrí a f/$f', 'DIAFRAGMA'));
-    } else {
-      final f = _nearestAperture(desiredF * math.pow(2, stops.abs() / 2));
-      options.add(('Cerrá a f/$f', 'DIAFRAGMA'));
-    }
-
-    // 2. ISO
-    final targetIso = shot.iso * math.pow(2, stops);
-    if (targetIso >= 50 && targetIso <= 25600) {
-      options.add(('ISO ${_nearestIso(targetIso).toStringAsFixed(0)}', 'SENSIBILIDAD'));
-    }
-
-    // 3. ND o obturador
-    if (stops < 0) {
-      final nd = CameraFilters.closestNd(stops);
-      if (nd != null) options.add((nd.name.split(' — ').first, 'FILTRO'));
-    } else {
-      final angle = (shot.shutterAngle * math.pow(2, stops)).clamp(11.25, 360.0);
-      options.add(('Obturador ${angle.toStringAsFixed(0)}°', 'OBTURADOR'));
-    }
+    final recipes = ExposureRecipes.suggest(
+      stops: result.stops,
+      aperture: desiredF,
+      iso: shot.iso,
+      shutterAngle: shot.shutterAngle,
+      apertureScale: CineData.apertures,
+      isoScale: CineData.isos,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionLabel('RECETARIO'),
         const SizedBox(height: 10),
-        ...options.take(3).map(
-              (o) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: OnSetColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white10),
+        ...recipes.map(
+          (r) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: OnSetColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    _recipeKindLabel(r.kind),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Colors.white38,
+                      letterSpacing: 1,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Text(
-                        o.$2,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          color: Colors.white38,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        o.$1,
-                        style: const TextStyle(fontSize: 13, color: Colors.white),
-                      ),
-                    ],
+                  const Spacer(),
+                  Text(
+                    _recipeValueLabel(r, result.stops),
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
                   ),
-                ),
+                ],
               ),
             ),
+          ),
+        ),
       ],
     );
   }
 
-  double _nearestAperture(double v) {
-    var best = CineData.apertures.first;
-    var diff = double.infinity;
-    for (final a in CineData.apertures) {
-      final d = (a - v).abs();
-      if (d < diff) {
-        diff = d;
-        best = a;
-      }
+  String _recipeKindLabel(RecipeKind kind) => switch (kind) {
+        RecipeKind.aperture => 'DIAFRAGMA',
+        RecipeKind.iso => 'SENSIBILIDAD',
+        RecipeKind.shutter => 'OBTURADOR',
+        RecipeKind.nd => 'FILTRO',
+      };
+
+  String _recipeValueLabel(ExposureRecipe recipe, double stops) {
+    switch (recipe.kind) {
+      case RecipeKind.aperture:
+        final f = recipe.value.toStringAsFixed(1).replaceAll('.0', '');
+        return stops > 0 ? 'Abrí a f/$f' : 'Cerrá a f/$f';
+      case RecipeKind.iso:
+        return 'ISO ${recipe.value.toStringAsFixed(0)}';
+      case RecipeKind.shutter:
+        return 'Obturador ${recipe.value.toStringAsFixed(0)}°';
+      case RecipeKind.nd:
+        final name = recipe.filterName ?? 'ND';
+        return name.split(' — ').first;
     }
-    return best;
   }
 
-  double _nearestIso(double v) {
-    var best = CineData.isos.first;
-    var diff = double.infinity;
-    for (final i in CineData.isos) {
-      final d = (i - v).abs();
-      if (d < diff) {
-        diff = d;
-        best = i;
-      }
-    }
-    return best;
-  }
 }
 
 // -----------------------------------------------------------------
