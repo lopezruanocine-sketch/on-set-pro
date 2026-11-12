@@ -1,0 +1,253 @@
+import 'package:flutter/material.dart';
+import 'dof_calculator_screen.dart';
+import 'exposure_screen.dart';
+import 'electricity_screen.dart';
+import 'storage_screen.dart'; // Import agregado correctamente
+import 'flicker_screen.dart';
+import 'color_screen.dart';
+import 'optics_screen.dart';
+
+class DashboardScreen extends StatelessWidget {
+  final String sensorName;
+  final bool isFilm;
+  final double coc;
+
+  const DashboardScreen({
+    super.key,
+    required this.sensorName,
+    required this.isFilm,
+    required this.coc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212), // Fondo principal oscuro
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF121212), // AppBar oscuro
+        elevation: 0,
+        title: const Text(
+          'ON SET PRO',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 4.0,
+          ),
+        ),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      // Cambiado a SingleChildScrollView para evitar errores de desbordamiento
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Tarjeta de información geométrica y simple (Estilo Dark Mode)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black, // Fondo de la tarjeta en negro puro
+                border: Border.all(
+                  color: Colors.white,
+                  width: 2,
+                ), // Borde blanco
+                borderRadius: BorderRadius.zero, // Bordes afilados
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'CÁMARA ACTIVA',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                      color: Colors.white, // Texto en blanco
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'FORMATO: ${sensorName.toUpperCase()}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white, // Texto en blanco
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'TIPO: ${isFilm ? "PELÍCULA" : "DIGITAL"}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white54, // Blanco sutil para jerarquía
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'CoC: $coc mm',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white54, // Blanco sutil para jerarquía
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+            const Text(
+              'HERRAMIENTAS',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: Colors.white, // Título en blanco
+                letterSpacing: 2.0,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 1. PROFUNDIDAD DE CAMPO
+            _buildDashboardCard(
+              title: 'PROFUNDIDAD DE CAMPO',
+              icon: Icons.center_focus_strong_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        DofCalculatorScreen(coc: coc, sensorName: sensorName),
+                  ),
+                );
+              },
+            ),
+
+            // 2. SISTEMA DE ZONAS / EXPO
+            _buildDashboardCard(
+              title: 'SISTEMA DE ZONAS / EXPO',
+              icon: Icons.exposure_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ExpoFotoTabs()),
+                );
+              },
+            ),
+
+            // 3. ELECTRICIDAD Y ENERGÍA
+            _buildDashboardCard(
+              title: 'ELECTRICIDAD Y ENERGÍA',
+              icon: Icons.bolt_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ElectricityScreen(),
+                  ),
+                );
+              },
+            ),
+
+            // 4. DATA Y ALMACENAMIENTO (Cambia dinámicamente según isFilm)
+            _buildDashboardCard(
+              title: isFilm ? 'CHASIS Y METRAJE' : 'DATA Y ALMACENAMIENTO',
+              icon: isFilm
+                  ? Icons.movie_creation_outlined
+                  : Icons.sd_storage_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        StorageScreen(isFilm: isFilm, sensorName: sensorName),
+                  ),
+                );
+              },
+            ),
+
+            // 6. FLICKER / PARPADEO
+            _buildDashboardCard(
+              title: 'FLICKER Y PARPADEO',
+              icon: Icons.light_mode_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FlickerScreen(),
+                  ),
+                );
+              },
+            ),
+            // 7. COLOR Y TEMPERATURA
+            _buildDashboardCard(
+              title: 'COLOR Y GELES (MIREDS)',
+              icon: Icons.palette_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ColorScreen()),
+                );
+              },
+            ),
+            // 8. ÓPTICA Y FOV
+            _buildDashboardCard(
+              title: 'ÓPTICA / FOV (LENS MATCHER)',
+              icon: Icons.camera_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OpticsScreen(
+                      sensorName: sensorName, // ¡Pasamos el sensor aquí!
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET ACTUALIZADO PARA MODO OSCURO ---
+  Widget _buildDashboardCard({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E), // Gris oscuro característico
+            borderRadius: BorderRadius.zero,
+            border: Border.all(color: Colors.white24, width: 1), // Borde sutil
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 28),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white54, // Flecha en blanco sutil
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
