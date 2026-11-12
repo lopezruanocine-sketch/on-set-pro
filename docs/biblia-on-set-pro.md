@@ -12,10 +12,24 @@
 
 ## ESTADO TÉCNICO HOY
 
-Verificado el 12/11/2026: el proyecto compila sin errores ni avisos (`flutter analyze` limpio),
-tiene 4 pruebas automáticas en verde y versión web que funciona. El código está bajo git:
-cualquier cambio se puede revertir. Pendiente de instalación para compilar en teléfono:
-CocoaPods (iPhone) y el SDK de Android.
+Verificado el 13/11/2026: el proyecto compila sin errores ni avisos (`flutter analyze` limpio)
+y tiene **80 pruebas automáticas en verde**. El código está bajo git: cualquier cambio se puede
+revertir. Pendiente de instalación para compilar en teléfono: CocoaPods (iPhone) y SDK de Android.
+
+**Núcleo de cálculo (Fase 1, en curso).** Las fórmulas ya no viven en las pantallas: están en
+`lib/domain/`, en Dart puro y con tests.
+
+| Motor | Qué resuelve | Pruebas |
+|---|---|---|
+| `exposure` | Zonas, fall-off, lux⇄f, compensación con ISO/obturador/filtros, ND | 26 |
+| `optics` | Hiperfocal, DoF exacto, FOV, encuadre a distancia, equivalencia de lentes | 12 |
+| `flicker` | Ventanas de obturador seguras por Hz y fps | 6 |
+| `color` | Mireds + asesor de gelatinas Lee/Rosco | 7 |
+| `power` | Ohm, caída de tensión, ampacidad con derating, generadores | 14 |
+| `storage` | Códecs (77 tasas), duración y copia DIT | 11 |
+
+Catálogos: gelatinas (31), cables H07RN-F y SOOW, códecs. Cada dato tiene su fuente en
+`docs/research/`.
 
 ---
 
