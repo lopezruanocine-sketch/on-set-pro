@@ -8,18 +8,16 @@ import 'color_screen.dart';
 import 'optics_screen.dart';
 import '../theme/app_theme.dart';
 import 'camera_setup_screen.dart';
+import '../data/camera_selection.dart';
 
 class DashboardScreen extends StatelessWidget {
-  final String sensorName;
-  final bool isFilm;
-  final double coc;
+  final CameraSelection selection;
 
-  const DashboardScreen({
-    super.key,
-    required this.sensorName,
-    required this.isFilm,
-    required this.coc,
-  });
+  const DashboardScreen({super.key, required this.selection});
+
+  String get sensorName => selection.label;
+  bool get isFilm => selection.isFilm;
+  double get coc => selection.cocMm;
 
   @override
   Widget build(BuildContext context) {
@@ -46,10 +44,7 @@ class DashboardScreen extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CameraSetupScreen(
-                    initialMode: isFilm ? 'film' : 'digital',
-                    initialFormat: sensorName,
-                  ),
+                  builder: (_) => CameraSetupScreen(initial: selection),
                 ),
               );
             },
@@ -102,7 +97,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'CoC: $coc mm',
+                    'CoC: ${coc.toStringAsFixed(4)} mm',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white54, // Blanco sutil para jerarquía

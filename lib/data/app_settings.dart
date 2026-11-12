@@ -1,23 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'camera_formats.dart';
-
-/// Cámara activa elegida por el usuario.
-class SavedCamera {
-  final String mode; // 'film' o 'digital'
-  final String format;
-
-  const SavedCamera({required this.mode, required this.format});
-
-  bool get isFilm => CameraFormats.isFilm(mode);
-
-  /// CoC en mm del formato. Nunca falla: si el formato ya no existe usa 0.030.
-  double get coc => CameraFormats.cocFor(mode, format) ?? 0.030;
-}
+import 'camera_selection.dart';
 
 /// Lo que la app necesita saber antes del primer frame.
 class AppBoot {
-  final SavedCamera? camera;
+  final CameraSelection? camera;
   final String language;
 
   const AppBoot({this.camera, this.language = 'es'});
@@ -27,27 +14,25 @@ class AppBoot {
 class AppSettings {
   AppSettings._();
 
-  static const _kMode = 'setup.mode';
-  static const _kFormat = 'setup.format';
   static const _kLang = 'app.lang';
+  static const _keys = ['camera.kind', 'camera.manufacturer', 'camera.camera', 'camera.mode', 'camera.film'];
 
   static Future<AppBoot> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString(_kMode);
-    final format = prefs.getString(_kFormat);
-    final language = prefs.getString(_kLang) ?? 'es';
-
-    SavedCamera? camera;
-    if (mode != null && format != null && CameraFormats.isValid(mode, format)) {
-      camera = SavedCamera(mode: mode, format: format);
-    }
-    return AppBoot(camera: camera, language: language);
+    final values = <String, String?>{
+      for (final k in _keys) k: prefs.getString(k),
+    };
+    return AppBoot(
+      camera: CameraSelection.fromPrefs(values),
+      language: prefs.getString(_kLang) ?? 'es',
+    );
   }
 
-  static Future<void> saveCamera(SavedCamera camera) async {
+  static Future<void> saveCamera(CameraSelection camera) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kMode, camera.mode);
-    await prefs.setString(_kFormat, camera.format);
+    for (final entry in camera.toPrefs().entries) {
+      await prefs.setString(entry.key, entry.value);
+    }
   }
 
   static Future<void> saveLanguage(String language) async {

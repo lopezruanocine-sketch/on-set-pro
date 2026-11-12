@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/localization.dart';
 import 'data/app_settings.dart';
+import 'data/camera_selection.dart';
 import 'presentation/camera_setup_screen.dart';
 import 'presentation/dashboard_screen.dart';
 import 'theme/app_theme.dart';
@@ -14,7 +15,7 @@ Future<void> main() async {
 }
 
 class OnSetPro extends StatelessWidget {
-  final SavedCamera? initialCamera;
+  final CameraSelection? initialCamera;
 
   const OnSetPro({super.key, this.initialCamera});
 
@@ -27,11 +28,7 @@ class OnSetPro extends StatelessWidget {
       theme: OnSetTheme.dark(),
       home: camera == null
           ? const CameraSetupScreen()
-          : DashboardScreen(
-              sensorName: camera.format,
-              isFilm: camera.isFilm,
-              coc: camera.coc,
-            ),
+          : DashboardScreen(selection: camera),
     );
   }
 }

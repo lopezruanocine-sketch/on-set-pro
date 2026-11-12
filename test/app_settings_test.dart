@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:on_set_pro/data/app_settings.dart';
+import 'package:on_set_pro/data/camera_selection.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -13,23 +14,41 @@ void main() {
     expect(boot.language, 'es');
   });
 
-  test('guarda la cámara y la recupera con su CoC', () async {
+  test('guarda una cámara digital con su modo y recupera el CoC del catálogo', () async {
     SharedPreferences.setMockInitialValues({});
-    await AppSettings.saveCamera(
-      const SavedCamera(mode: 'film', format: '35mm 4-Perf'),
+    const selection = CameraSelection(
+      kind: 'digital',
+      manufacturer: 'ARRI',
+      camera: 'ALEXA 35',
+      mode: '4.6K 3:2 Open Gate',
     );
+    await AppSettings.saveCamera(selection);
 
     final boot = await AppSettings.load();
     expect(boot.camera, isNotNull);
-    expect(boot.camera!.format, '35mm 4-Perf');
-    expect(boot.camera!.isFilm, isTrue);
-    expect(boot.camera!.coc, 0.025);
+    expect(boot.camera!.label, 'ALEXA 35 · 4.6K 3:2 Open Gate');
+    expect(boot.camera!.isFilm, isFalse);
+    expect(boot.camera!.cocMm, closeTo(0.0226, 0.0005));
+    expect(boot.camera!.baseIso, 800);
   });
 
-  test('ignora una cámara guardada con formato inexistente', () async {
+  test('guarda un formato fílmico y recupera su CoC', () async {
+    SharedPreferences.setMockInitialValues({});
+    const selection = CameraSelection(kind: 'film', filmFormat: '35mm 4-perf full');
+    await AppSettings.saveCamera(selection);
+
+    final boot = await AppSettings.load();
+    expect(boot.camera!.isFilm, isTrue);
+    expect(boot.camera!.cocMm, closeTo(0.0254, 0.0001));
+    expect(boot.camera!.widthMm, closeTo(24.92, 0.01));
+  });
+
+  test('ignora un modo que no existe en el catálogo', () async {
     SharedPreferences.setMockInitialValues({
-      'setup.mode': 'digital',
-      'setup.format': 'Formato Que No Existe',
+      'camera.kind': 'digital',
+      'camera.manufacturer': 'ARRI',
+      'camera.camera': 'ALEXA 35',
+      'camera.mode': 'Modo Inventado',
     });
     final boot = await AppSettings.load();
     expect(boot.camera, isNull);

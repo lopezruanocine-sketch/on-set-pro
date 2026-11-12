@@ -1,35 +1,61 @@
 import 'package:flutter/material.dart';
+
 import '../core/localization.dart';
 import '../data/app_settings.dart';
-import '../data/camera_formats.dart';
+import '../data/camera_selection.dart';
+import '../data/catalogs/film_formats.dart';
+import '../data/catalogs/sensors.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 
+/// Pantalla de inicio: elegir cámara real (del catálogo) y el modo de grabación.
 class CameraSetupScreen extends StatefulWidget {
   final VoidCallback? onLangChange;
-  final String? initialMode;
-  final String? initialFormat;
+  final CameraSelection? initial;
 
-  const CameraSetupScreen({
-    super.key,
-    this.onLangChange,
-    this.initialMode,
-    this.initialFormat,
-  });
-  
-  @override 
+  const CameraSetupScreen({super.key, this.onLangChange, this.initial});
+
+  @override
   State<CameraSetupScreen> createState() => _CameraSetupScreenState();
 }
 
 class _CameraSetupScreenState extends State<CameraSetupScreen> {
-  String? mode;
-  String? selectedFormat;
+  String? kind;
+  String? cameraLabel;
+  String? modeName;
+  String? filmName;
 
   @override
   void initState() {
     super.initState();
-    mode = widget.initialMode;
-    selectedFormat = widget.initialFormat;
+    final initial = widget.initial;
+    if (initial != null) {
+      kind = initial.kind;
+      cameraLabel = initial.camera == null ? null : '${initial.manufacturer} ${initial.camera}';
+      modeName = initial.mode;
+      filmName = initial.filmFormat;
+    }
+  }
+
+  List<SensorMode> get _modes =>
+      cameraLabel == null ? const [] : SensorCatalog.modesOf(cameraLabel!);
+
+  CameraSelection? get _selection {
+    if (kind == 'film') {
+      if (filmName == null) return null;
+      return CameraSelection(kind: 'film', filmFormat: filmName);
+    }
+    if (kind == 'digital') {
+      final m = _modes.where((x) => x.mode == modeName).toList();
+      if (m.isEmpty) return null;
+      return CameraSelection(
+        kind: 'digital',
+        manufacturer: m.first.manufacturer,
+        camera: m.first.camera,
+        mode: m.first.mode,
+      );
+    }
+    return null;
   }
 
   @override
@@ -66,7 +92,6 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                 ),
               ),
               const SizedBox(height: 50),
-              
               Row(
                 children: [
                   _modeCard(t('film'), Icons.movie_creation_outlined, 'film', Colors.amber),
@@ -74,68 +99,137 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                   _modeCard(t('dig'), Icons.sensor_window_outlined, 'digital', Colors.blueAccent),
                 ],
               ),
-              
-              if (mode != null) ...[
+              if (kind == 'digital') ...[
                 const SizedBox(height: 30),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: OnSetColors.surface,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedFormat,
-                      isExpanded: true,
-                      hint: Text(t('sel_fmt'), style: const TextStyle(color: Colors.white38)),
-                      icon: const Icon(Icons.arrow_drop_down, color: Colors.white24),
-                      dropdownColor: OnSetColors.surfaceHigh,
-                      items: CameraFormats.namesFor(mode!)
-                          .map((e) => DropdownMenuItem(
-                                value: e,
-                                child: Text(e, style: const TextStyle(fontSize: 13, color: Colors.white)),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => selectedFormat = v),
-                    ),
-                  ),
+                _dropdown(
+                  label: 'CÁMARA',
+                  hint: 'Elegí la cámara',
+                  value: cameraLabel,
+                  items: SensorCatalog.cameras,
+                  onChanged: (v) => setState(() {
+                    cameraLabel = v;
+                    modeName = v == null ? null : SensorCatalog.firstModeOf(v)?.mode;
+                  }),
                 ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: OnSetColors.brand,
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  onPressed: selectedFormat == null
+                const SizedBox(height: 15),
+                _dropdown(
+                  label: 'MODO DE GRABACIÓN',
+                  hint: cameraLabel == null ? 'Primero elegí la cámara' : 'Elegí el modo',
+                  value: modeName,
+                  items: _modes.map((m) => m.mode).toList(),
+                  onChanged: cameraLabel == null
                       ? null
-                      : () async {
-                          final camera = SavedCamera(
-                            mode: mode!,
-                            format: selectedFormat!,
-                          );
-                          await AppSettings.saveCamera(camera);
-                          if (!context.mounted) return;
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (c) => DashboardScreen(
-                                sensorName: camera.format,
-                                isFilm: camera.isFilm,
-                                coc: camera.coc,
-                              ),
-                            ),
-                          );
-                        },
-                  child: Text(t('enter'), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      : (v) => setState(() => modeName = v),
                 ),
+                if (_selection != null) _details(_selection!),
               ],
+              if (kind == 'film') ...[
+                const SizedBox(height: 30),
+                _dropdown(
+                  label: 'FORMATO FÍLMICO',
+                  hint: 'Elegí el formato',
+                  value: filmName,
+                  items: FilmFormats.all.map((f) => f.name).toList(),
+                  onChanged: (v) => setState(() => filmName = v),
+                ),
+                if (_selection != null) _details(_selection!),
+              ],
+              const SizedBox(height: 30),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: OnSetColors.brand,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                onPressed: _selection == null ? null : _enter,
+                child: Text(
+                  t('enter'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _enter() async {
+    final selection = _selection;
+    if (selection == null) return;
+    await AppSettings.saveCamera(selection);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (c) => DashboardScreen(selection: selection)),
+    );
+  }
+
+  Widget _details(CameraSelection s) {
+    final sensor = s.sensor;
+    final film = s.film;
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Text(
+        [
+          if (sensor != null) '${sensor.widthMm} × ${sensor.heightMm} mm',
+          if (sensor?.baseIso != null) 'ISO base ${sensor!.baseIso!.toStringAsFixed(0)}',
+          if (film != null) '${film.widthMm} × ${film.heightMm} mm',
+          if (film != null) '${film.feetPerMinute.toStringAsFixed(0)} ft/min a 24 fps',
+          'CoC ${s.cocMm.toStringAsFixed(4)} mm',
+        ].join('   ·   '),
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 11, color: OnSetColors.textSecondary, height: 1.6),
+      ),
+    );
+  }
+
+  Widget _dropdown({
+    required String label,
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9,
+            color: OnSetColors.textMuted,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: OnSetColors.surface,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              hint: Text(hint, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white24),
+              dropdownColor: OnSetColors.surfaceHigh,
+              items: items
+                  .map((e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(e, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                      ))
+                  .toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -154,18 +248,20 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
   }
 
   Widget _modeCard(String txt, IconData i, String v, Color c) {
-    bool sel = mode == v;
+    final sel = kind == v;
     return Expanded(
       child: InkWell(
         onTap: () => setState(() {
-          mode = v;
-          selectedFormat = null;
+          kind = v;
+          cameraLabel = null;
+          modeName = null;
+          filmName = null;
         }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: 100,
           decoration: BoxDecoration(
-            color: sel ? const Color(0xFF2C2C2E) : const Color(0xFF1E1E1E),
+            color: sel ? OnSetColors.surfaceHigh : OnSetColors.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: sel ? c.withValues(alpha: 0.5) : Colors.transparent,
