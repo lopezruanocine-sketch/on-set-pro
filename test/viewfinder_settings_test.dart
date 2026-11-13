@@ -6,11 +6,13 @@ import 'package:on_set_pro/data/viewfinder_settings.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('sin memoria previa usa los valores de fábrica', () async {
+  test('sin memoria previa no hay sensor y usa el de la cámara activa', () async {
     SharedPreferences.setMockInitialValues({});
     final s = await ViewfinderSettings.load();
     expect(s.cameraId, isNull);
-    expect(s.sensorWidthMm, 12.52);
+    // Sin sensor guardado, el visor toma el de la cámara elegida al entrar.
+    expect(s.sensorWidthMm, isNull);
+    expect(s.sensorHeightMm, isNull);
     expect(s.focalMm, 25);
     expect(s.phoneFov, 70);
     expect(s.squeeze, isFalse);

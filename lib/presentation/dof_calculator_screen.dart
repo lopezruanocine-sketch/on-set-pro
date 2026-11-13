@@ -6,6 +6,7 @@ import '../core/cine_data.dart';
 import '../core/localization.dart';
 import '../core/pro_input.dart';
 import '../domain/optics/optics_engine.dart';
+import '../domain/optics/units_format.dart';
 import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 
@@ -145,13 +146,11 @@ class _DofCalculatorScreenState extends State<DofCalculatorScreen> {
     );
   }
 
-  String _fmtMm(double mm) {
-    if (!mm.isFinite || mm > 1e7) return 'INFINITO';
-    final metres = mm / 1000;
-    return useFeet
-        ? '${(metres * _ftPerM).toStringAsFixed(2)} ft'
-        : '${metres.toStringAsFixed(2)} m';
-  }
+  String _fmtMm(double mm) => formatDistance(
+        millimetres: mm,
+        useFeet: useFeet,
+        feetPerMetre: _ftPerM,
+      );
 
   Widget _aperturePicker() {
     return Column(
