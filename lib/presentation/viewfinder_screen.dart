@@ -55,6 +55,11 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   /// El dispositivo no permite zoom por software.
   bool zoomUnsupported = false;
 
+  /// Zoom por dibujo (agranda la imagen en pantalla). Se usa sólo cuando la
+  /// cámara no puede acercar; algunos navegadores lo muestran en negro, así
+  /// que se puede apagar.
+  bool visualZoom = true;
+
   @override
   void initState() {
     super.initState();
@@ -282,11 +287,36 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   }
 
   /// La imagen, con zoom digital para igualar el campo de visión del lente.
-  /// La vista de la cámara, tal cual: sin escalas ni tamaños raros.
+  /// La vista de la cámara.
   ///
-  /// El acercamiento lo hace la cámara del dispositivo con su propio zoom;
-  /// así la imagen se dibuja exactamente igual que en la app de cámara.
-  Widget _zoomedPreview(ViewfinderFrame frame) => CameraPreview(controller!);
+  /// Primero intenta que acerque la propia cámara (queda igual que en la app
+  /// de cámara). Si el dispositivo no puede, y el usuario lo permite, se
+  /// agranda la imagen al dibujarla: eso no cambia el tamaño de la vista, que
+  /// es lo que dejaba la pantalla en negro.
+  Widget _zoomedPreview(ViewfinderFrame frame) {
+    final wantsZoom = !zoomUnsupported && appliedZoom <= 1.02;
+    final raw = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
+    final visual = visualZoom && wantsZoom && raw.isFinite
+        ? raw.clamp(1.0, 8.0)
+        : 1.0;
+
+    if (visual <= 1.02) return CameraPreview(controller!);
+
+    return ClipRect(
+      child: Transform.scale(
+        scale: visual,
+        child: CameraPreview(controller!),
+      ),
+    );
+  }
+
+  /// Cuánto se está acercando la imagen que se ve.
+  double _visibleZoom(ViewfinderFrame frame) {
+    if (appliedZoom > 1.02 && !zoomUnsupported) return appliedZoom;
+    final raw = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
+    if (!visualZoom || raw.isNaN) return 1;
+    return raw.clamp(1.0, 8.0);
+  }
 
   /// Pide a la cámara que acerque lo necesario para igualar el lente elegido.
   Future<void> _applyCameraZoom(ViewfinderFrame frame) async {
@@ -345,15 +375,13 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          zoomUnsupported
-              ? 'ESTE DISPOSITIVO NO PERMITE ZOOM · ENCUADRE COMPLETO'
-              : frame.widthFraction >= 0.999
-                  ? 'MÁS ANGULAR QUE LA CÁMARA DEL TELÉFONO'
-                  : 'ZOOM DE CÁMARA ${appliedZoom.toStringAsFixed(1)}×',
+          frame.widthFraction >= 0.999
+              ? 'MÁS ANGULAR QUE LA CÁMARA DEL TELÉFONO'
+              : _visibleZoom(frame) > 1.02
+                  ? 'ZOOM ${_visibleZoom(frame).toStringAsFixed(1)}×'
+                  : 'ENCUADRE COMPLETO · SIN ZOOM',
           style: TextStyle(
-            color: zoomUnsupported || frame.widthFraction >= 0.999
-                ? OnSetColors.danger
-                : Colors.white54,
+            color: frame.widthFraction >= 0.999 ? OnSetColors.danger : Colors.white54,
             fontSize: 9,
             shadows: const [Shadow(blurRadius: 6, color: Colors.black)],
           ),
@@ -443,10 +471,6 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
           children: [
             _cameraRow(),
             const SizedBox(height: 8),
-            if (devices.length > 1) ...[
-              _lensChips(),
-              const SizedBox(height: 8),
-            ],
             _focalRow(),
             const SizedBox(height: 8),
             Row(
@@ -479,6 +503,27 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
                 ),
               ],
             ),
+            if (appliedZoom <= 1.02) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: _toggle('ZOOM VISUAL', visualZoom, () {
+                      setState(() => visualZoom = !visualZoom);
+                    }),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Acerca la imagen en pantalla cuando la cámara '
+                      'no puede hacerlo.',
+                      style: TextStyle(fontSize: 8, color: Colors.white24, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             _fovField(),
             const SizedBox(height: 10),
@@ -489,72 +534,80 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
     );
   }
 
+  /// Una sola fila con los lentes del dispositivo: elegir y ver cuál está
+  /// activo es lo mismo, así no hay dos listas iguales en pantalla.
   Widget _cameraRow() {
-    final label = current?.label ?? (devices.isEmpty ? 'SIN CÁMARA' : 'ELEGÍ UNA CÁMARA');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: OnSetColors.surface,
-        border: Border.all(color: Colors.white24),
-      ),
+    if (devices.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: OnSetColors.surface,
+          border: Border.all(color: Colors.white24),
+        ),
+        child: const Text(
+          'SIN CÁMARA',
+          style: TextStyle(fontSize: 10, color: Colors.white38),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          const Icon(Icons.videocam_outlined, color: OnSetColors.brand, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: Colors.white70),
+          for (final device in devices)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: GestureDetector(
+                onTap: () => _start(device),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: device.id == current?.id
+                        ? OnSetColors.brand
+                        : OnSetColors.surface,
+                    border: Border.all(
+                      color: device.id == current?.id
+                          ? OnSetColors.brand
+                          : Colors.white24,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        device.isFront ? Icons.camera_front : Icons.camera_rear,
+                        size: 13,
+                        color: device.id == current?.id ? Colors.black : Colors.white38,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _lensTag(device),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: device.id == current?.id ? Colors.black : Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
           GestureDetector(
-            onTap: devices.isEmpty ? null : _chooseCamera,
-            child: Text(
-              'CAMBIAR',
-              style: TextStyle(
-                fontSize: 9,
-                letterSpacing: 1,
-                fontWeight: FontWeight.bold,
-                color: devices.isEmpty ? Colors.white24 : OnSetColors.brand,
+            onTap: _chooseCamera,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(border: Border.all(color: Colors.white12)),
+              child: const Text(
+                'VER TODAS',
+                style: TextStyle(fontSize: 9, color: Colors.white38, letterSpacing: 0.5),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  /// Los lentes físicos del teléfono, como los botones 0.5× / 1× / 3×.
-  Widget _lensChips() {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final device in devices)
-          GestureDetector(
-            onTap: () => _start(device),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: device.id == current?.id ? OnSetColors.brand : Colors.transparent,
-                border: Border.all(
-                  color: device.id == current?.id ? OnSetColors.brand : Colors.white24,
-                ),
-              ),
-              child: Text(
-                _lensTag(device),
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: device.id == current?.id ? Colors.black : Colors.white54,
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 
