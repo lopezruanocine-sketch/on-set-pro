@@ -48,6 +48,13 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   /// completa: se desliza el tirador hacia arriba o abajo.
   bool controlsOpen = true;
 
+  /// Zoom que aplicó la propia cámara del dispositivo. La vista no se toca:
+  /// es la cámara la que acerca la imagen, como en la app de cámara.
+  double appliedZoom = 1;
+
+  /// El dispositivo no permite zoom por software.
+  bool zoomUnsupported = false;
+
   @override
   void initState() {
     super.initState();
@@ -142,6 +149,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
         current = device;
         error = null;
       });
+      await _applyCameraZoom(_frame);
       if (remember) await _persist();
     } catch (e) {
       if (!mounted) return;
@@ -274,35 +282,37 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   }
 
   /// La imagen, con zoom digital para igualar el campo de visión del lente.
-  Widget _zoomedPreview(ViewfinderFrame frame) {
-    // Zoom acotado: más de 8× no aporta y sí puede romper el dibujado.
-    final rawZoom = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
-    final zoom = rawZoom.isFinite ? rawZoom.clamp(1.0, 8.0) : 1.0;
+  /// La vista de la cámara, tal cual: sin escalas ni tamaños raros.
+  ///
+  /// El acercamiento lo hace la cámara del dispositivo con su propio zoom;
+  /// así la imagen se dibuja exactamente igual que en la app de cámara.
+  Widget _zoomedPreview(ViewfinderFrame frame) => CameraPreview(controller!);
 
-    // Sin zoom no se toca nada: la vista se dibuja como siempre (lo que ya
-    // funcionaba). El zoom sólo agranda la caja, sin matrices de por medio.
-    if (zoom <= 1.001) {
-      return CameraPreview(controller!);
+  /// Pide a la cámara que acerque lo necesario para igualar el lente elegido.
+  Future<void> _applyCameraZoom(ViewfinderFrame frame) async {
+    final cam = controller;
+    if (cam == null || !cam.value.isInitialized) return;
+
+    final raw = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
+    final desired = raw.isFinite ? raw.clamp(1.0, 8.0) : 1.0;
+
+    try {
+      final minZoom = await cam.getMinZoomLevel();
+      final maxZoom = await cam.getMaxZoomLevel();
+      final target = desired.clamp(minZoom, maxZoom).toDouble();
+      await cam.setZoomLevel(target);
+      if (!mounted) return;
+      setState(() {
+        appliedZoom = target;
+        zoomUnsupported = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appliedZoom = 1;
+        zoomUnsupported = desired > 1.02;
+      });
     }
-
-    return LayoutBuilder(
-      builder: (context, box) {
-        final width = box.maxWidth.isFinite ? box.maxWidth * zoom : null;
-        final height = box.maxHeight.isFinite ? box.maxHeight * zoom : null;
-        if (width == null || height == null) {
-          return CameraPreview(controller!);
-        }
-        return ClipRect(
-          child: Center(
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: CameraPreview(controller!),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Rect _fitRect(double maxW, double maxH, double aspect) {
@@ -320,7 +330,6 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   }
 
   Widget _readout(ViewfinderFrame frame) {
-    final zoom = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -336,11 +345,15 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          frame.widthFraction >= 0.999
-              ? 'MÁS ANGULAR QUE LA CÁMARA DEL TELÉFONO'
-              : 'ZOOM DIGITAL ${zoom.toStringAsFixed(1)}× · recorte de la imagen',
+          zoomUnsupported
+              ? 'ESTE DISPOSITIVO NO PERMITE ZOOM · ENCUADRE COMPLETO'
+              : frame.widthFraction >= 0.999
+                  ? 'MÁS ANGULAR QUE LA CÁMARA DEL TELÉFONO'
+                  : 'ZOOM DE CÁMARA ${appliedZoom.toStringAsFixed(1)}×',
           style: TextStyle(
-            color: frame.widthFraction >= 0.999 ? OnSetColors.danger : Colors.white54,
+            color: zoomUnsupported || frame.widthFraction >= 0.999
+                ? OnSetColors.danger
+                : Colors.white54,
             fontSize: 9,
             shadows: const [Shadow(blurRadius: 6, color: Colors.black)],
           ),
@@ -555,21 +568,20 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   }
 
   Widget _focalRow() {
-    const focales = [12.0, 14, 18, 21, 25, 32, 35, 40, 50, 65, 75, 85, 100, 135, 150];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             const Text(
-              'FOCAL',
+              'FOCAL (mm)',
               style: TextStyle(fontSize: 8, color: Colors.white38, fontWeight: FontWeight.bold),
             ),
             const Spacer(),
             Text(
-              '${focal.toStringAsFixed(0)} mm',
+              focal.toStringAsFixed(focal % 1 == 0 ? 0 : 1),
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'monospace',
@@ -577,30 +589,50 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
             ),
           ],
         ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 2,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-            activeTrackColor: OnSetColors.brand,
-            inactiveTrackColor: Colors.white12,
-            thumbColor: OnSetColors.brand,
-            overlayShape: SliderComponentShape.noOverlay,
-          ),
-          child: Slider(
-            value: focal.clamp(focales.first, focales.last).toDouble(),
-            min: focales.first.toDouble(),
-            max: focales.last.toDouble(),
-            divisions: 60,
-            onChanged: (v) {
-              setState(() {
-                // Redondeo a focales reales: nadie tiene un 37 mm.
-                final nearest = focales.reduce(
-                  (a, b) => (a - v).abs() <= (b - v).abs() ? a : b,
-                );
-                focal = nearest.toDouble();
-              });
-              _persist();
-            },
+        const SizedBox(height: 4),
+        // Cualquier focal escrita a mano: 80 mm, 37 mm, la que exista.
+        _FocalField(
+          value: focal,
+          onChanged: (v) {
+            setState(() => focal = v);
+            _persist();
+          },
+        ),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final f in const <double>[12, 14, 18, 21, 25, 32, 35, 40, 50, 65, 75, 80, 85, 100, 135])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => focal = f);
+                      _persist();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: (focal - f).abs() < 0.01 ? OnSetColors.brand : Colors.transparent,
+                        border: Border.all(
+                          color: (focal - f).abs() < 0.01
+                              ? OnSetColors.brand
+                              : Colors.white24,
+                        ),
+                      ),
+                      child: Text(
+                        f.toStringAsFixed(0),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: (focal - f).abs() < 0.01 ? Colors.black : Colors.white54,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
@@ -926,6 +958,69 @@ class _GuidesPainter extends CustomPainter {
       old.titleSafe != titleSafe ||
       old.thirds != thirds ||
       old.covers != covers;
+}
+
+/// Campo para escribir cualquier focal, incluidas las que no son redondas.
+class _FocalField extends StatefulWidget {
+  final double value;
+  final Function(double) onChanged;
+
+  const _FocalField({required this.value, required this.onChanged});
+
+  @override
+  State<_FocalField> createState() => _FocalFieldState();
+}
+
+class _FocalFieldState extends State<_FocalField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.value.toStringAsFixed(0));
+
+  @override
+  void didUpdateWidget(covariant _FocalField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (double.tryParse(_controller.text) != widget.value) {
+      _controller.text = widget.value.toStringAsFixed(
+        widget.value % 1 == 0 ? 0 : 1,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        border: Border.all(color: OnSetColors.brand.withValues(alpha: 0.6)),
+      ),
+      child: TextField(
+        controller: _controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontFamily: 'monospace',
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          suffixText: 'mm',
+          suffixStyle: TextStyle(color: Colors.white38, fontSize: 11),
+        ),
+        onChanged: (v) {
+          final n = double.tryParse(v.replaceAll(',', '.'));
+          if (n != null && n >= 4 && n <= 400) widget.onChanged(n);
+        },
+      ),
+    );
+  }
 }
 
 /// Campo chico para el ángulo del teléfono.
