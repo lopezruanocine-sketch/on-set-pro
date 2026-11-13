@@ -15,9 +15,9 @@ El menú sigue el flujo de un rodaje, de arriba abajo:
 
 | Departamento | Herramientas |
 |---|---|
-| Eléctrico | Circuito (soporte, cable, generador) y fases (reparto de cargas) |
 | Cámara y óptica | Visor con zonas seguras, óptica/FOV, profundidad de campo |
 | Imagen y exposición | Sistema de zonas, color y geles, flicker |
+| Eléctrico | Circuito (soporte, cable, generador) y fases (reparto de cargas) |
 | Producción | Luz solar (hora azul y dorada), data, planes y notas |
 | Utilidades | Calculadora de cine, linterna |
 

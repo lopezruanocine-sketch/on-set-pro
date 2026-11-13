@@ -58,27 +58,8 @@ class DashboardScreen extends StatelessWidget {
 
   List<_Department> get _departments => [
         _Department(
-          name: 'ELÉCTRICO',
-          purpose: 'instalación: corriente, cables y reparto',
-          color: OnSetColors.power,
-          tools: [
-            _Tool(
-              title: 'CIRCUITO',
-              detail: '¿aguanta el soporte? corriente, cable y generador',
-              icon: Icons.bolt_outlined,
-              open: (context) => const ElectricityScreen(),
-            ),
-            _Tool(
-              title: 'FASES',
-              detail: 'reparto de varias cargas entre las tres fases',
-              icon: Icons.electrical_services,
-              open: (context) => const ElectricityScreen(initialTab: 1),
-            ),
-          ],
-        ),
-        _Department(
           name: 'CÁMARA Y ÓPTICA',
-          purpose: 'armar: encuadre, lente y foco',
+          purpose: 'encuadre, lente y foco',
           color: OnSetColors.camera,
           tools: [
             _Tool(
@@ -103,7 +84,7 @@ class DashboardScreen extends StatelessWidget {
         ),
         _Department(
           name: 'IMAGEN Y EXPOSICIÓN',
-          purpose: 'exponer y corregir: la luz que llega al sensor',
+          purpose: 'la luz que llega al sensor',
           color: OnSetColors.image,
           tools: [
             _Tool(
@@ -127,8 +108,27 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         _Department(
+          name: 'ELÉCTRICO',
+          purpose: 'corriente, cables y reparto por fases',
+          color: OnSetColors.power,
+          tools: [
+            _Tool(
+              title: 'CIRCUITO',
+              detail: '¿aguanta el soporte? corriente, cable y generador',
+              icon: Icons.bolt_outlined,
+              open: (context) => const ElectricityScreen(),
+            ),
+            _Tool(
+              title: 'FASES',
+              detail: 'reparto de varias cargas entre las tres fases',
+              icon: Icons.electrical_services,
+              open: (context) => const ElectricityScreen(initialTab: 1),
+            ),
+          ],
+        ),
+        _Department(
           name: 'PRODUCCIÓN',
-          purpose: 'planificar y registrar: cuándo, cuánto y qué',
+          purpose: 'sol, material y registro del rodaje',
           color: OnSetColors.data,
           tools: [
             _Tool(
@@ -153,7 +153,7 @@ class DashboardScreen extends StatelessWidget {
         ),
         _Department(
           name: 'UTILIDADES',
-          purpose: 'lo transversal: cuentas y linterna',
+          purpose: 'cuentas rápidas y linterna',
           color: OnSetColors.tools,
           tools: [
             _Tool(
