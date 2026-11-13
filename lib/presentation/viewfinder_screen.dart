@@ -129,7 +129,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
           lensDirection: device.direction,
           sensorOrientation: 90,
         ),
-        ResolutionPreset.veryHigh,
+        ResolutionPreset.high,
         enableAudio: false,
       );
       await next.initialize();
@@ -140,6 +140,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
       setState(() {
         controller = next;
         current = device;
+        error = null;
       });
       if (remember) await _persist();
     } catch (e) {
@@ -274,16 +275,33 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
 
   /// La imagen, con zoom digital para igualar el campo de visión del lente.
   Widget _zoomedPreview(ViewfinderFrame frame) {
-    final zoom = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
-    return ClipRect(
-      child: OverflowBox(
-        maxWidth: double.infinity,
-        maxHeight: double.infinity,
-        child: Transform.scale(
-          scale: zoom,
-          child: SizedBox.expand(child: CameraPreview(controller!)),
-        ),
-      ),
+    // Zoom acotado: más de 8× no aporta y sí puede romper el dibujado.
+    final rawZoom = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
+    final zoom = rawZoom.isFinite ? rawZoom.clamp(1.0, 8.0) : 1.0;
+
+    // Sin zoom no se toca nada: la vista se dibuja como siempre (lo que ya
+    // funcionaba). El zoom sólo agranda la caja, sin matrices de por medio.
+    if (zoom <= 1.001) {
+      return CameraPreview(controller!);
+    }
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        final width = box.maxWidth.isFinite ? box.maxWidth * zoom : null;
+        final height = box.maxHeight.isFinite ? box.maxHeight * zoom : null;
+        if (width == null || height == null) {
+          return CameraPreview(controller!);
+        }
+        return ClipRect(
+          child: Center(
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: CameraPreview(controller!),
+            ),
+          ),
+        );
+      },
     );
   }
 
