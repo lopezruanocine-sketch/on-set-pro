@@ -207,15 +207,19 @@ class ExposureEngine {
   ///
   /// Si el fotómetro pide f/16 y la cámara está en f/2.8, la escena está 5 pasos
   /// por encima del gris medio y cae en la zona 10.
+  ///
+  /// [lossStops] son las pérdidas que están delante del sensor (ND, polarizador)
+  /// o en la luz (gelatinas): oscurecen la imagen y bajan la escena de zona.
   static ZoneReading zoneReading({
     required double meterAperture,
     required double cameraAperture,
     double targetZone = 5,
+    double lossStops = 0,
   }) {
     final stops = 2 * DMath.log2(
       DMath.positive(meterAperture) / DMath.positive(cameraAperture),
     );
-    final rawZone = 5 + stops;
+    final rawZone = 5 + stops - lossStops;
     // Mover la escena a una zona más alta exige añadir luz (positivo).
     final correction = targetZone - rawZone;
     return ZoneReading(
@@ -246,9 +250,13 @@ class ExposureEngine {
     required double iso,
     required double shutterTime,
     double calibration = Photometry.incidentFlat,
+    double lossStops = 0,
   }) {
     final n2 = DMath.positive(aperture) * DMath.positive(aperture);
-    return calibration * n2 / (DMath.positive(iso) * DMath.positive(shutterTime));
+    return calibration *
+        n2 *
+        DMath.pow2(lossStops) /
+        (DMath.positive(iso) * DMath.positive(shutterTime));
   }
 
   /// Diafragma que corresponde a una iluminancia (lux).
@@ -257,10 +265,12 @@ class ExposureEngine {
     required double iso,
     required double shutterTime,
     double calibration = Photometry.incidentFlat,
+    double lossStops = 0,
   }) {
     final value = DMath.positive(lux) *
         DMath.positive(iso) *
-        DMath.positive(shutterTime) /
+        DMath.positive(shutterTime) *
+        DMath.pow2(-lossStops) /
         DMath.positive(calibration);
     return math.sqrt(value);
   }

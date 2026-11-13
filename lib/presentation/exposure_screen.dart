@@ -104,6 +104,7 @@ class _ZoneSystemScreenState extends State<ZoneSystemScreen> {
           meterAperture: meteredF,
           cameraAperture: cameraF,
           targetZone: targetZone.toDouble(),
+          lossStops: shot.lossStops,
         );
         final nd = reading.correctionStops < -0.15
             ? CameraFilters.closestNd(reading.correctionStops)
@@ -504,24 +505,39 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               ),
               const SizedBox(height: 15),
               _shutterControl(shot),
-              const SizedBox(height: 15),
-              _stringDropdown(
-                "FILTRO ND",
-                shot.filter.name,
-                CameraFilters.all.map((f) => f.name).toList(),
-                (v) => shot.setFilter(CameraFilters.byName(v)),
+              const SizedBox(height: 25),
+              _sectionLabel('FILTROS DE CÁMARA (DELANTE DEL SENSOR)'),
+              const SizedBox(height: 8),
+              _lossList(
+                items: [
+                  for (final f in shot.cameraFilters) (f.name, f.stops),
+                ],
+                options: CameraFilters.all
+                    .where((f) => f.stops > 0)
+                    .map((f) => f.name)
+                    .toList(),
+                emptyText: 'Sin filtros: la lente está limpia.',
+                onAdd: (name) => shot.addFilter(CameraFilters.byName(name)),
+                onRemove: (i) => shot.removeFilter(shot.cameraFilters[i]),
               ),
-              const SizedBox(height: 15),
-              _stringDropdown(
-                "GEL / DIFUSIÓN",
-                shot.gel?.label ?? 'Ninguno',
-                ['Ninguno', ...LightGels.all.map((g) => g.label)],
-                (v) => shot.setGel(
-                  v == 'Ninguno'
-                      ? null
-                      : LightGels.all.firstWhere((g) => g.label == v),
+              const SizedBox(height: 20),
+              _sectionLabel('GELATINAS EN LA LUZ (DELANTE DE LA FUENTE)'),
+              const SizedBox(height: 8),
+              _lossList(
+                items: [
+                  for (final g in shot.gels) (g.label, g.stops),
+                ],
+                options: LightGels.all.map((g) => g.label).toList(),
+                emptyText: 'Sin gelatinas: la fuente va limpia.',
+                onAdd: (label) => shot.addGel(
+                  LightGels.all.firstWhere((g) => g.label == label),
                 ),
+                onRemove: (i) => shot.removeGel(shot.gels[i]),
               ),
+              const SizedBox(height: 10),
+              _meterGelToggle(shot),
+              const SizedBox(height: 12),
+              _lossTotal(shot),
               const SizedBox(height: 30),
               _resultCard(
                 stops: result.stops,
@@ -627,8 +643,10 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
         '${shot.fps.toStringAsFixed(shot.fps % 1 == 0 ? 0 : 2)} fps a ${shot.shutterAngle.toStringAsFixed(0)}°',
         breakdown.shutterCorrection,
       ),
-      if (shot.filterStops != 0) (shot.filter.name, breakdown.filterCorrection),
-      if (shot.gelStops != 0) (shot.gel!.label, breakdown.gelCorrection),
+      if (shot.filterStops != 0)
+        ('FILTROS DE CÁMARA', breakdown.filterCorrection),
+      if (shot.gelStopsToCompensate != 0)
+        ('GELATINAS EN LA LUZ', breakdown.gelCorrection),
     ];
 
     return Container(
@@ -697,7 +715,25 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
       shutterAngle: shot.shutterAngle,
       apertureScale: CineData.apertures,
       isoScale: CineData.isos,
+      filters: [
+        for (final f in shot.cameraFilters) (f.name, f.stops),
+      ],
     );
+
+    if (recipes.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabel('RECETARIO'),
+          const SizedBox(height: 8),
+          _hint(
+            result.stops > 0
+                ? 'No alcanza con una sola variable: hace falta sumar luz en la escena.'
+                : 'No alcanza con una sola variable: hace falta quitar luz en la escena o duplicar el filtro.',
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -742,7 +778,8 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
         RecipeKind.aperture => 'DIAFRAGMA',
         RecipeKind.iso => 'SENSIBILIDAD',
         RecipeKind.shutter => 'OBTURADOR',
-        RecipeKind.nd => 'FILTRO',
+        RecipeKind.nd => 'PONER FILTRO',
+        RecipeKind.removeFilter => 'QUITAR FILTRO',
       };
 
   String _recipeValueLabel(ExposureRecipe recipe, double stops) {
@@ -757,6 +794,9 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
       case RecipeKind.nd:
         final name = recipe.filterName ?? 'ND';
         return name.split(' — ').first;
+      case RecipeKind.removeFilter:
+        final name = recipe.filterName ?? 'filtro';
+        return 'Quitá ${name.split(' — ').first}';
     }
   }
 
@@ -785,9 +825,19 @@ class _LFSUState extends State<LuxFStopUnifiedTool> {
         final shot = ShotState.instance;
         final result = isLuxToFStop
             ? ExposureEngine.apertureForLux(
-                lux: val, iso: shot.iso, shutterTime: shot.shutterTime, calibration: calibration)
+                lux: val,
+                iso: shot.iso,
+                shutterTime: shot.shutterTime,
+                calibration: calibration,
+                lossStops: shot.lossStops,
+              )
             : ExposureEngine.luxForAperture(
-                aperture: val, iso: shot.iso, shutterTime: shot.shutterTime, calibration: calibration);
+                aperture: val,
+                iso: shot.iso,
+                shutterTime: shot.shutterTime,
+                calibration: calibration,
+                lossStops: shot.lossStops,
+              );
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(25),
@@ -1064,47 +1114,6 @@ Widget _dropdown(
   );
 }
 
-Widget _stringDropdown(
-  String label,
-  String val,
-  List<String> options,
-  Function(String) onChanged,
-) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _sectionLabel(label),
-      const SizedBox(height: 8),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: OnSetColors.surface,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: options.contains(val) ? val : options.first,
-            isExpanded: true,
-            dropdownColor: OnSetColors.surfaceHigh,
-            items: options
-                .map(
-                  (e) => DropdownMenuItem(
-                    value: e,
-                    child: Text(
-                      e,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) => onChanged(v!),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
 Widget _manualInput(String label, double val, Function(double) onChanged) {
   return _ManualField(label: label, value: val, onChanged: onChanged);
 }
@@ -1176,4 +1185,178 @@ class _ManualFieldState extends State<_ManualField> {
       ],
     );
   }
+}
+
+/// Lista de filtros o gelatinas aplicados, con la opción de agregar y quitar.
+///
+/// Se pueden apilar: un ND + polarizador delante del sensor, un CTO + difusión
+/// delante de la fuente. Cada uno aporta sus pasos y el total se muestra aparte.
+Widget _lossList({
+  required List<(String, double)> items,
+  required List<String> options,
+  required String emptyText,
+  required void Function(String) onAdd,
+  required void Function(int) onRemove,
+}) {
+  final selected = items.map((i) => i.$1).toSet();
+  final available = options.where((o) => !selected.contains(o)).toList();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (items.isEmpty)
+        Text(
+          emptyText,
+          style: const TextStyle(fontSize: 10, color: Colors.white38),
+        )
+      else
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (var i = 0; i < items.length; i++)
+              _lossChip(items[i].$1, items[i].$2, () => onRemove(i)),
+          ],
+        ),
+      if (available.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: OnSetColors.surface,
+            border: Border.all(color: Colors.white24),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: null,
+              hint: const Text(
+                '+ AGREGAR',
+                style: TextStyle(fontSize: 10, color: Colors.white54, letterSpacing: 1),
+              ),
+              isExpanded: true,
+              dropdownColor: OnSetColors.surfaceHigh,
+              icon: const Icon(Icons.add, color: Colors.white38, size: 18),
+              items: available
+                  .map((o) => DropdownMenuItem(
+                        value: o,
+                        child: Text(
+                          o,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onAdd(v);
+              },
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+Widget _lossChip(String label, double stops, VoidCallback onRemove) {
+  return GestureDetector(
+    onTap: onRemove,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        border: Border.all(color: OnSetColors.danger.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.white)),
+          const SizedBox(width: 8),
+          Text(
+            '−${stops.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: OnSetColors.danger,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.close, size: 12, color: Colors.white38),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Aclara si la lectura del fotómetro ya incluye las gelatinas de la luz.
+Widget _meterGelToggle(ShotState shot) {
+  return GestureDetector(
+    onTap: () => shot.setMeterIncludesGels(!shot.meterIncludesGels),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: shot.meterIncludesGels ? OnSetColors.surfaceHigh : Colors.transparent,
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            shot.meterIncludesGels ? Icons.check_box : Icons.check_box_outline_blank,
+            size: 18,
+            color: shot.meterIncludesGels ? OnSetColors.brand : Colors.white38,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'LA LECTURA YA INCLUYE LAS GELATINAS',
+                  style: TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Si mediste con la gelatina puesta, no se vuelve a descontar.',
+                  style: TextStyle(fontSize: 9, color: Colors.white38),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Pérdida total del plano, separada por familia.
+Widget _lossTotal(ShotState shot) {
+  final total = shot.lossStops;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: Colors.black,
+      border: Border.all(color: total > 0 ? OnSetColors.danger : Colors.white12),
+    ),
+    child: Row(
+      children: [
+        const Text(
+          'PÉRDIDA DE LUZ DEL PLANO',
+          style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        const Spacer(),
+        Text(
+          'cámara −${shot.filterStops.toStringAsFixed(1)} · luz −${shot.gelStops.toStringAsFixed(1)}',
+          style: const TextStyle(fontSize: 9, color: Colors.white38),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          total == 0 ? '0' : '−${total.toStringAsFixed(1)}',
+          style: TextStyle(
+            fontSize: 16,
+            fontFamily: 'monospace',
+            color: total > 0 ? OnSetColors.danger : Colors.white38,
+          ),
+        ),
+      ],
+    ),
+  );
 }

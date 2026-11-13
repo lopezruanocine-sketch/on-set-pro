@@ -120,6 +120,30 @@ pantalla usan signos opuestos y eso es una bomba de tiempo.
 
 ---
 
+## Filtros y gelatinas: las dos familias (13/11/2026)
+
+En set hay dos familias de filtros y las dos cuestan luz, siempre en pasos:
+
+| Familia | Dónde va | Ejemplos | ¿Se compensa siempre? |
+|---|---|---|---|
+| **Filtros de cámara** | delante del sensor | ND, IRND, polarizador, 85/80A, 81x | **Sí**: la luz que pierden no está en la lectura del fotómetro |
+| **Gelatinas en la luz** | delante de la fuente | CTO/CTB, plus/minus green, difusión | **Depende**: si la lectura se tomó con la gelatina puesta, ya está contada |
+
+Cómo quedó implementado:
+
+- **Se apilan.** Se pueden poner ND 1.2 + polarizador delante del sensor, y CTO + difusión en
+  la fuente. Cada uno aporta sus pasos y el total se muestra aparte:
+  "cámara −5.7 · luz −0.7 · total −6.4".
+- **Cada familia tiene su lista** en Compensar, con chips que se agregan y se quitan.
+- **Un interruptor aclara la medición**: "la lectura ya incluye las gelatinas". Si está
+  activado, la app no descuenta dos veces la gelatina.
+- **Las pérdidas entran en las cuatro herramientas**: Compensar, Zonas (la escena baja de
+  zona), Fall-Off (por las distancias) y Fotometría (el diafragma necesario se abre).
+- **El recetario entiende la estructura**: con 6 pasos de filtro puestos ya no propone ISO
+  25600 ni f/0.4; propone **quitar el ND 1.2**, que es lo que haría un DP.
+
+---
+
 ## Estado de implementación (13/11/2026)
 
 Ya está hecho y con pruebas:

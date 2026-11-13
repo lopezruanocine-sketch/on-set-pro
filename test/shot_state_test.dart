@@ -53,22 +53,57 @@ void main() {
     expect(s.shutterDenominator, closeTo(96, 1e-6));
   });
 
-  test('el resumen muestra ISO, obturador y ND', () {
+  test('el resumen muestra ISO, obturador y la pérdida de cámara', () {
     final s = ShotState.instance;
     s.setIso(800);
     s.setFps(24);
     s.setShutterAngle(180);
-    s.setFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
+    s.addFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
     expect(s.summary, contains('ISO 800'));
     expect(s.summary, contains('1/48'));
-    expect(s.summary, contains('ND 0.6'));
+    expect(s.summary, contains('cámara −2.0'));
   });
 
-  test('el filtro y la gelatina aportan sus pasos', () {
+  test('los filtros de cámara se apilan y suman sus pasos', () {
     final s = ShotState.instance;
-    s.setFilter(CameraFilters.byName('ND 1.2 — 4 stops'));
-    s.setGel(LightGels.all.firstWhere((g) => g.code == '204'));
-    expect(s.filterStops, 4.0);
+    s.addFilter(CameraFilters.byName('ND 1.2 — 4 stops'));
+    s.addFilter(CameraFilters.byName('Polarizador circular'));
+    expect(s.filterStops, closeTo(5.7, 0.01));
+  });
+
+  test('las gelatinas se apilan y suman sus pasos', () {
+    final s = ShotState.instance;
+    s.addGel(LightGels.all.firstWhere((g) => g.code == '204'));
+    s.addGel(LightGels.all.firstWhere((g) => g.code == '250'));
+    expect(s.gelStops, closeTo(1.42, 0.01));
+  });
+
+  test('quitar un filtro descuenta sus pasos', () {
+    final s = ShotState.instance;
+    s.addFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
+    expect(s.filterStops, 2.0);
+    s.removeFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
+    expect(s.filterStops, 0);
+  });
+
+  test('si la lectura incluye las gelatinas no se descuentan dos veces', () {
+    final s = ShotState.instance;
+    s.addGel(LightGels.all.firstWhere((g) => g.code == '204'));
+    s.addFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
+
+    expect(s.lossStops, closeTo(2.67, 0.01));
+    s.setMeterIncludesGels(true);
+    expect(s.lossStops, 2.0);
+    // La gelatina sigue informada aunque no se compense.
     expect(s.gelStops, closeTo(0.67, 0.01));
+  });
+
+  test('el resumen separa cámara y luz', () {
+    final s = ShotState.instance;
+    s.setIso(800);
+    s.addFilter(CameraFilters.byName('ND 0.6 — 2 stops'));
+    s.addGel(LightGels.all.firstWhere((g) => g.code == '204'));
+    expect(s.summary, contains('cámara −2.0'));
+    expect(s.summary, contains('luz −0.7'));
   });
 }

@@ -234,4 +234,50 @@ void main() {
       expect(b.total, closeTo(0, 1e-9));
     });
   });
+
+  group('pérdidas de filtros y gelatinas', () {
+    test('un ND de 2 pasos baja la escena dos zonas', () {
+      final sin = ExposureEngine.zoneReading(meterAperture: 16, cameraAperture: 2.8);
+      final con = ExposureEngine.zoneReading(
+        meterAperture: 16,
+        cameraAperture: 2.8,
+        lossStops: 2,
+      );
+      expect(sin.rawZone, closeTo(10.03, 0.02));
+      expect(con.rawZone, closeTo(8.03, 0.02));
+      // Con el ND puesto hace falta más luz para llegar a la misma zona.
+      expect(con.correctionStops, greaterThan(sin.correctionStops));
+    });
+
+    test('la fotometría abre diafragma cuando hay pérdidas', () {
+      final sin = ExposureEngine.apertureForLux(
+        lux: 1000,
+        iso: 800,
+        shutterTime: 1 / 48,
+      );
+      final con = ExposureEngine.apertureForLux(
+        lux: 1000,
+        iso: 800,
+        shutterTime: 1 / 48,
+        lossStops: 2,
+      );
+      expect(con, closeTo(sin / 2, 1e-9));
+    });
+
+    test('lux y diafragma siguen siendo reversibles con pérdidas', () {
+      final n = ExposureEngine.apertureForLux(
+        lux: 1000,
+        iso: 800,
+        shutterTime: 1 / 48,
+        lossStops: 3,
+      );
+      final lux = ExposureEngine.luxForAperture(
+        aperture: n,
+        iso: 800,
+        shutterTime: 1 / 48,
+        lossStops: 3,
+      );
+      expect(lux, closeTo(1000, 1e-6));
+    });
+  });
 }
