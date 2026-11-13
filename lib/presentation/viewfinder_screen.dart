@@ -10,6 +10,8 @@ import '../data/viewfinder_settings.dart';
 import '../domain/optics/viewfinder_math.dart';
 import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
+import 'video_zoom_stub.dart'
+    if (dart.library.js_interop) 'video_zoom_web.dart';
 import 'viewfinder_guides.dart';
 
 /// Visor de dirección: la imagen de la cámara del teléfono con el encuadre de
@@ -164,6 +166,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
 
   @override
   void dispose() {
+    clearVideoZoom();
     controller?.dispose();
     super.dispose();
   }
@@ -253,7 +256,12 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
     return LayoutBuilder(
       builder: (context, box) {
         // El cuadro ocupa lo máximo posible con la proporción de la cámara.
-        final frameRect = _fitRect(box.maxWidth, box.maxHeight, frame.aspectRatio);
+        // Con zoom, el cuadro es la pantalla entera; sin zoom, el cuadro es
+        // la parte de la imagen que va a quedar en la foto.
+        final fills = _frameFillsScreen(frame);
+        final frameRect = fills
+            ? Rect.fromLTWH(0, 0, box.maxWidth, box.maxHeight)
+            : _fitRect(box.maxWidth, box.maxHeight, frame.aspectRatio);
         return Stack(
           children: [
             Positioned.fill(child: _zoomedPreview(frame)),
@@ -266,6 +274,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
                     titleSafe: titleSafe,
                     thirds: thirds,
                     covers: frame.coversSensor,
+                    dimOutside: !fills,
                   ),
                 ),
               ),
@@ -294,21 +303,35 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   /// agranda la imagen al dibujarla: eso no cambia el tamaño de la vista, que
   /// es lo que dejaba la pantalla en negro.
   Widget _zoomedPreview(ViewfinderFrame frame) {
-    final wantsZoom = !zoomUnsupported && appliedZoom <= 1.02;
-    final raw = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
-    final visual = visualZoom && wantsZoom && raw.isFinite
-        ? raw.clamp(1.0, 8.0)
-        : 1.0;
-
-    if (visual <= 1.02) return CameraPreview(controller!);
-
-    return ClipRect(
-      child: Transform.scale(
-        scale: visual,
-        child: CameraPreview(controller!),
-      ),
-    );
+    // La vista nunca se toca: en web el zoom es una regla CSS sobre el video y
+    // en teléfono lo hace la propia cámara.
+    _syncZoom(frame);
+    return CameraPreview(controller!);
   }
+
+  /// Aplica el zoom que corresponda al lente elegido.
+  void _syncZoom(ViewfinderFrame frame) {
+    final visual = _visualZoomFor(frame);
+    if (visual <= 1.02) {
+      clearVideoZoom();
+    } else {
+      setVideoZoom(visual);
+    }
+  }
+
+  /// Zoom por dibujo: sólo cuando la cámara no acercó por su cuenta.
+  double _visualZoomFor(ViewfinderFrame frame) {
+    if (!visualZoom) return 1;
+    if (appliedZoom > 1.02) return 1; // ya acercó la cámara
+    final raw = frame.widthFraction <= 0 ? 1.0 : 1 / frame.widthFraction;
+    if (!raw.isFinite) return 1;
+    return raw.clamp(1.0, 8.0).toDouble();
+  }
+
+  /// Si la imagen ya está acercada, el cuadro es toda la pantalla: es lo que
+  /// ve la cámara de cine y no hace falta achicar nada.
+  bool _frameFillsScreen(ViewfinderFrame frame) =>
+      appliedZoom > 1.02 || _visualZoomFor(frame) > 1.02;
 
   /// Cuánto se está acercando la imagen que se ve.
   double _visibleZoom(ViewfinderFrame frame) {
@@ -361,6 +384,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
 
   Widget _readout(ViewfinderFrame frame) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -982,6 +1006,7 @@ class _GuidesPainter extends CustomPainter {
   final bool titleSafe;
   final bool thirds;
   final bool covers;
+  final bool dimOutside;
 
   const _GuidesPainter({
     required this.frame,
@@ -989,6 +1014,7 @@ class _GuidesPainter extends CustomPainter {
     required this.titleSafe,
     required this.thirds,
     required this.covers,
+    this.dimOutside = true,
   });
 
   @override
@@ -1001,11 +1027,13 @@ class _GuidesPainter extends CustomPainter {
       thirds: thirds,
       frameColor: covers ? OnSetColors.brand : OnSetColors.danger,
       canvasSize: size,
+      dimOutside: dimOutside && frame != (Offset.zero & size),
     );
   }
 
   @override
   bool shouldRepaint(covariant _GuidesPainter old) =>
+      old.dimOutside != dimOutside ||
       old.frame != frame ||
       old.safeAspect != safeAspect ||
       old.titleSafe != titleSafe ||
