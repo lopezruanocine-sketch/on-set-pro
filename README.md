@@ -15,10 +15,10 @@ El menú sigue el flujo de un rodaje, de arriba abajo:
 
 | Departamento | Herramientas |
 |---|---|
-| Luz y energía | Circuito y reparto por fases, luz solar (hora azul y dorada) |
+| Eléctrico | Circuito (soporte, cable, generador) y fases (reparto de cargas) |
 | Cámara y óptica | Visor con zonas seguras, óptica/FOV, profundidad de campo |
 | Imagen y exposición | Sistema de zonas, color y geles, flicker |
-| Data y producción | Data y almacenamiento, planes y notas con exportación |
+| Producción | Luz solar (hora azul y dorada), data, planes y notas |
 | Utilidades | Calculadora de cine, linterna |
 
 ## Cómo está hecho

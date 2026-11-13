@@ -58,21 +58,21 @@ class DashboardScreen extends StatelessWidget {
 
   List<_Department> get _departments => [
         _Department(
-          name: 'LUZ Y ENERGÍA',
-          purpose: 'encender: fuentes, corriente y hora solar',
+          name: 'ELÉCTRICO',
+          purpose: 'instalación: corriente, cables y reparto',
           color: OnSetColors.power,
           tools: [
             _Tool(
-              title: 'ELÉCTRICO',
-              detail: 'circuito y reparto de cargas por fase',
+              title: 'CIRCUITO',
+              detail: '¿aguanta el soporte? corriente, cable y generador',
               icon: Icons.bolt_outlined,
               open: (context) => const ElectricityScreen(),
             ),
             _Tool(
-              title: 'LUZ SOLAR',
-              detail: 'hora azul, dorada y posición del sol',
-              icon: Icons.wb_twilight,
-              open: (context) => const SolarScreen(),
+              title: 'FASES',
+              detail: 'reparto de varias cargas entre las tres fases',
+              icon: Icons.electrical_services,
+              open: (context) => const ElectricityScreen(initialTab: 1),
             ),
           ],
         ),
@@ -127,10 +127,16 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         _Department(
-          name: 'DATA Y PRODUCCIÓN',
-          purpose: 'grabar y registrar: material y planos',
+          name: 'PRODUCCIÓN',
+          purpose: 'planificar y registrar: cuándo, cuánto y qué',
           color: OnSetColors.data,
           tools: [
+            _Tool(
+              title: 'LUZ SOLAR',
+              detail: 'hora azul, dorada y posición del sol',
+              icon: Icons.wb_twilight,
+              open: (context) => const SolarScreen(),
+            ),
             _Tool(
               title: isFilm ? 'CHASIS Y METRAJE' : 'DATA Y ALMACENAMIENTO',
               detail: isFilm ? 'pies, tiempo y chasis' : 'códecs, espacio y copia DIT',

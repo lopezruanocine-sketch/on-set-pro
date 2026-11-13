@@ -26,10 +26,11 @@ void main() {
   testWidgets('el menú está agrupado en cinco departamentos', (tester) async {
     await pump(tester);
     for (final name in [
-      'LUZ Y ENERGÍA',
+      'CIRCUITO',
+      'FASES',
       'CÁMARA Y ÓPTICA',
       'IMAGEN Y EXPOSICIÓN',
-      'DATA Y PRODUCCIÓN',
+      'PRODUCCIÓN',
       'UTILIDADES',
     ]) {
       expect(find.text(name), findsOneWidget, reason: name);
@@ -44,7 +45,8 @@ void main() {
       'PROFUNDIDAD DE CAMPO',
       'SISTEMA DE ZONAS / EXPO',
       'FLICKER Y PARPADEO',
-      'ELÉCTRICO',
+      'CIRCUITO',
+      'FASES',
       'COLOR Y GELES',
       'LUZ SOLAR',
       'DATA Y ALMACENAMIENTO',
