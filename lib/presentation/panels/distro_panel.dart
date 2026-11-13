@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../data/distro_presets.dart';
@@ -49,7 +51,10 @@ class _DistroPanelState extends State<DistroPanel> {
   @override
   Widget build(BuildContext context) {
     final plan = DistroEngine.distribute(
-      loads: [for (final l in loads) Load(name: l.name, watts: l.watts)],
+      loads: [
+        for (final l in loads)
+          Load(name: l.name, watts: l.watts, phase: l.phase),
+      ],
       voltage: widget.voltage,
       limitAmps: limitAmps,
     );
@@ -86,7 +91,7 @@ class _DistroPanelState extends State<DistroPanel> {
                 padding: const EdgeInsets.only(top: 8),
                 child: GestureDetector(
                   onTap: () => setState(() {
-                    loads.addAll(const [
+                    loads.addAll([
                       _DistroLoad(name: '2 kW (HMI)', watts: 2000),
                       _DistroLoad(name: '2 kW (HMI)', watts: 2000),
                       _DistroLoad(name: 'Panel LED', watts: 900),
@@ -203,7 +208,7 @@ class _DistroPanelState extends State<DistroPanel> {
                     loads
                       ..clear()
                       ..addAll(preset.loads.map(
-                        (l) => _DistroLoad(name: l.name, watts: l.watts),
+                        (l) => _DistroLoad(name: l.name, watts: l.watts, phase: l.phase),
                       ));
                   });
                 },
@@ -283,7 +288,9 @@ class _DistroPanelState extends State<DistroPanel> {
     if (name == null) return;
     final preset = await DistroPresets.instance.save(
       name: name,
-      loads: [for (final l in loads) PresetLoad(name: l.name, watts: l.watts)],
+      loads: [
+        for (final l in loads) PresetLoad(name: l.name, watts: l.watts, phase: l.phase),
+      ],
     );
     if (!mounted) return;
     setState(() => selectedPreset = preset.id);
@@ -391,53 +398,182 @@ class _DistroPanelState extends State<DistroPanel> {
   }
 
   List<Widget> _loadRows(DistroPlan plan) {
-    final phasesByName = <String, int>{};
-    for (final a in plan.assigned) {
-      if (a.phase != null) phasesByName['${a.name}-${a.watts}'] = a.phase!;
+    // Asignación final después del reparto: la manual manda.
+    final assignedPhase = <int, int>{};
+    for (var i = 0; i < plan.assigned.length; i++) {
+      final p = plan.assigned[i].phase;
+      if (p != null) assignedPhase[i] = p;
     }
+
+    final phaseVoltage = widget.voltage / math.sqrt(3);
+    final perPhaseLimit = limitAmps;
+
     return [
       for (var i = 0; i < loads.length; i++)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: OnSetColors.surface,
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 34,
-                  child: Text(
-                    'F${(phasesByName['${loads[i].name}-${loads[i].watts}'] ?? 0) + 1}',
-                    style: const TextStyle(fontSize: 10, color: OnSetColors.power, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    loads[i].name,
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-                SizedBox(
-                  width: 70,
-                  child: Text(
-                    '${loads[i].watts.toStringAsFixed(0)} W',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(fontSize: 11, color: Colors.white54, fontFamily: 'monospace'),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () => setState(() => loads.removeAt(i)),
-                  child: const Icon(Icons.close, size: 14, color: Colors.white24),
-                ),
-              ],
-            ),
+        _loadRow(i, assignedPhase[i], phaseVoltage, perPhaseLimit),
+    ];
+  }
+
+  Widget _loadRow(int index, int? effectivePhase, double phaseVoltage, double perPhaseLimit) {
+    final load = loads[index];
+    final manual = load.phase != null;
+    // Una sola carga que ya no entra en una fase, ni repartida.
+    final tooBig = perPhaseLimit > 0 && load.watts / phaseVoltage > perPhaseLimit;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: OnSetColors.surface,
+          border: Border.all(
+            color: tooBig ? OnSetColors.danger : Colors.white10,
           ),
         ),
-    ];
+        child: Row(
+          children: [
+            // La fase se toca para moverla a mano o volver a automático.
+            GestureDetector(
+              onTap: () => _cyclePhase(index),
+              child: Container(
+                width: 46,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: manual ? OnSetColors.surfaceHigh : Colors.transparent,
+                  border: Border.all(
+                    color: tooBig
+                        ? OnSetColors.danger
+                        : (manual ? OnSetColors.power : Colors.white12),
+                  ),
+                ),
+                child: Text(
+                  manual ? 'F${load.phase! + 1}' : 'AUTO',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: tooBig
+                        ? OnSetColors.danger
+                        : (manual ? Colors.white : Colors.white38),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _editLoad(index),
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      load.name,
+                      style: const TextStyle(fontSize: 12, color: Colors.white),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tooBig
+                          ? 'No entra en una fase: ${(load.watts / phaseVoltage).toStringAsFixed(1)} A'
+                          : '${effectivePhase == null ? '' : 'Fase ${effectivePhase + 1} · '}tocar para editar',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: tooBig ? OnSetColors.danger : Colors.white24,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 62,
+              child: Text(
+                '${load.watts.toStringAsFixed(0)} W',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white54,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => setState(() => loads.removeAt(index)),
+              child: const Icon(Icons.close, size: 14, color: Colors.white24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// AUTO → F1 → F2 → F3 → AUTO: mover una carga de fase con un toque.
+  void _cyclePhase(int index) {
+    setState(() {
+      final current = loads[index].phase;
+      loads[index].phase = current == null ? 0 : (current >= 2 ? null : current + 1);
+    });
+  }
+
+  /// Edita nombre y watts de una carga sin borrarla y volver a crearla.
+  Future<void> _editLoad(int index) async {
+    final load = loads[index];
+    final nameController = TextEditingController(text: load.name);
+    final wattsController = TextEditingController(text: load.watts.toStringAsFixed(0));
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: OnSetColors.surface,
+        title: const Text('Editar carga', style: TextStyle(fontSize: 15, color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Qué está conectado',
+                labelStyle: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: wattsController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Watts',
+                labelStyle: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCELAR', style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'GUARDAR',
+              style: TextStyle(color: OnSetColors.power, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (saved != true) return;
+    final watts = double.tryParse(wattsController.text);
+    if (watts == null || watts <= 0) return;
+    setState(() {
+      load.name = nameController.text.trim().isEmpty ? 'Carga' : nameController.text.trim();
+      load.watts = watts;
+    });
   }
 
   Widget _addLoad() {
@@ -454,8 +590,8 @@ class _DistroPanelState extends State<DistroPanel> {
               controller: nameController,
               style: const TextStyle(color: Colors.white, fontSize: 12),
               decoration: const InputDecoration(
-                hintText: 'M18',
-                hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                hintText: 'Qué está conectado',
+                hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
                 isDense: true,
                 border: InputBorder.none,
               ),
@@ -468,8 +604,8 @@ class _DistroPanelState extends State<DistroPanel> {
               keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white, fontSize: 12),
               decoration: const InputDecoration(
-                hintText: '1800 W',
-                hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                hintText: 'Watts',
+                hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
                 isDense: true,
                 border: InputBorder.none,
               ),
@@ -505,10 +641,13 @@ class _DistroPanelState extends State<DistroPanel> {
 }
 
 class _DistroLoad {
-  final String name;
-  final double watts;
+  String name;
+  double watts;
 
-  const _DistroLoad({required this.name, required this.watts});
+  /// Fase elegida a mano (0, 1, 2). `null` = que la app la reparta.
+  int? phase;
+
+  _DistroLoad({required this.name, required this.watts, this.phase});
 }
 
 class _DistroField extends StatefulWidget {

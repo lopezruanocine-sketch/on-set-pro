@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../data/catalogs/camera_filters.dart';
+import '../data/catalogs/light_gels.dart';
 import '../data/shots_repository.dart';
+import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 
 /// Planos guardados y notas de cámara / iluminación.
@@ -158,12 +161,52 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
                     style: const TextStyle(fontSize: 11, color: Colors.white70),
                   ),
                 ],
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () => _applyPlan(plan),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: OnSetColors.brand),
+                    ),
+                    child: const Text(
+                      'APLICAR AL PLANO ACTUAL',
+                      style: TextStyle(
+                        fontSize: 9,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.bold,
+                        color: OnSetColors.brand,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  /// Vuelve a cargar en el plano actual todo lo que tenía ese plano guardado.
+  void _applyPlan(ShotPlan plan) {
+    final shot = ShotState.instance;
+    shot.setIso(plan.iso);
+    shot.setFps(plan.fps);
+    shot.setShutterAngle(plan.shutterAngle);
+    shot.clearFilters();
+    shot.clearGels();
+    for (final name in plan.filterNames) {
+      shot.addFilter(CameraFilters.byName(name));
+    }
+    for (final label in plan.gelLabels) {
+      final gel = LightGels.all.where((g) => g.label == label).firstOrNull;
+      if (gel != null) shot.addGel(gel);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Plano aplicado: ${plan.cameraLabel}')),
+    );
+    setState(() {});
   }
 
   Widget _notesTab(ShotsRepository repo) {

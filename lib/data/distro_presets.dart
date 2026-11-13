@@ -7,13 +7,21 @@ class PresetLoad {
   final String name;
   final double watts;
 
-  const PresetLoad({required this.name, required this.watts});
+  /// Fase fijada a mano; `null` = la reparte la app.
+  final int? phase;
 
-  Map<String, dynamic> toJson() => {'name': name, 'watts': watts};
+  const PresetLoad({required this.name, required this.watts, this.phase});
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'watts': watts,
+        if (phase != null) 'phase': phase,
+      };
 
   static PresetLoad fromJson(Map<String, dynamic> json) => PresetLoad(
         name: json['name'] as String? ?? 'Carga',
         watts: (json['watts'] as num?)?.toDouble() ?? 0,
+        phase: (json['phase'] as num?)?.toInt(),
       );
 }
 
