@@ -157,8 +157,8 @@ class _ZoneSystemScreenState extends State<ZoneSystemScreen> {
               ),
               const SizedBox(height: 30),
               _resultCard(
-                deviation: -reading.correctionStops,
-                title: 'CÓMO ESTÁ LA ESCENA',
+                correction: reading.correctionStops,
+                title: 'INSTRUCCIÓN PARA ILUMINACIÓN',
                 subtitle: _zoneSubtitle(reading, nd),
               ),
               if (nd != null) ...[
@@ -284,7 +284,7 @@ class _ISTState extends State<InverseSquareTool> {
           ),
           const SizedBox(height: 25),
           _resultCard(
-            deviation: result.stops,
+            correction: -result.stops,
             title: 'LA LUZ CAMBIA',
             subtitle: isLoss
                 ? 'La fuente pierde ${result.stops.abs().toStringAsFixed(1)} stops al alejarse. '
@@ -536,7 +536,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               _meterGelToggle(shot),
               const SizedBox(height: 30),
               _resultCard(
-                deviation: -result.stops,
+                correction: result.stops,
                 title: 'DESBALANCE',
               ),
               const SizedBox(height: 16),
@@ -1189,20 +1189,22 @@ Widget _legendDot(Color color, String label) {
 }
 
 Widget _resultCard({
-  /// Cuánto está desviada la imagen: **negativo = abajo** (falta luz),
-  /// **positivo = arriba** (sobra luz). La acción es siempre al revés.
-  required double deviation,
+  /// Cuánto hay que compensar: **positivo = sumar luz**, **negativo = quitarla**.
+  ///
+  /// El número es la acción, no el diagnóstico: si dice +4, sumás 4 pasos.
+  /// Así el signo y la frase de abajo nunca se contradicen.
+  required double correction,
   required String title,
   String? subtitle,
 }) {
-  final balanced = deviation.abs() < 0.05;
-  // Rojo cuando falta luz: es el caso que obliga a sumar unidades o potencia.
-  // Ámbar cuando sobra: se resuelve cerrando o con un filtro.
+  final balanced = correction.abs() < 0.05;
+  // Rojo cuando hay que sumar luz: es el caso que obliga a más unidades o
+  // potencia. Ámbar cuando hay que quitarla: se resuelve cerrando o con ND.
   final accent = balanced
       ? OnSetColors.ok
-      : (deviation < 0 ? OnSetColors.danger : OnSetColors.brand);
-  final amount = deviation.abs().toStringAsFixed(1).replaceAll('.', ',');
-  final action = deviation < 0 ? 'SUMÁ $amount PASOS' : 'QUITÁ $amount PASOS';
+      : (correction > 0 ? OnSetColors.danger : OnSetColors.brand);
+  final amount = correction.abs().toStringAsFixed(1).replaceAll('.', ',');
+  final action = correction > 0 ? 'SUMÁ $amount PASOS' : 'QUITÁ $amount PASOS';
 
   return Container(
     width: double.infinity,
@@ -1222,7 +1224,7 @@ Widget _resultCard({
         Text(
           balanced
               ? 'OK'
-              : '${deviation > 0 ? '+' : '−'}${deviation.abs().toStringAsFixed(1)} PASOS',
+              : '${correction > 0 ? '+' : '−'}${correction.abs().toStringAsFixed(1)} PASOS',
           style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, color: accent),
         ),
         if (!balanced) ...[
