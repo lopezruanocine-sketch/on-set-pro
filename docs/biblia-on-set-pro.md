@@ -106,16 +106,17 @@ grid de tarjetas con **color por departamento**.
 ## 6. MAPA DE LA APP
 
 ```
-Inicio (elegir fílmico o digital + formato)
-   └── Menú principal
-         ├── Profundidad de campo
-         ├── Sistema de zonas / Exposición  (4 sub-pantallas)
-         ├── Electricidad y energía
-         ├── Data y almacenamiento  (digital) / Chasis y metraje (fílmico)
-         ├── Flicker y parpadeo
-         ├── Color y geles (mireds)
-         └── Óptica / FOV (lens matcher)
+Inicio (elegir cámara y modo, o formato fílmico)
+   └── Menú principal, ordenado por departamentos
+         ├── CÁMARA Y ÓPTICA ──── Visor · Óptica/FOV · Profundidad de campo · ND rápido
+         ├── IMAGEN Y EXPOSICIÓN ─ Sistema de zonas/Expo · Flicker
+         ├── LUZ Y ELÉCTRICO ───── Electricidad · Distro · Color y geles · Luz solar
+         ├── DATA Y PRODUCCIÓN ─── Data/Chasis · Planos y notas
+         └── UTILIDADES ────────── Calculadora de cine · Linterna
 ```
+
+Cada departamento tiene su color y un subtítulo con lo que resuelve, así se
+encuentra la herramienta por área y no por memoria.
 
 ---
 

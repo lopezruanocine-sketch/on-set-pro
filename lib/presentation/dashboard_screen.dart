@@ -1,21 +1,54 @@
 import 'package:flutter/material.dart';
-import 'dof_calculator_screen.dart';
-import 'exposure_screen.dart';
-import 'electricity_screen.dart';
-import 'storage_screen.dart'; // Import agregado correctamente
-import 'flicker_screen.dart';
-import 'color_screen.dart';
-import 'optics_screen.dart';
+
+import '../data/camera_selection.dart';
 import '../theme/app_theme.dart';
 import 'camera_setup_screen.dart';
+import 'cine_calculator_screen.dart';
+import 'color_screen.dart';
 import 'distro_screen.dart';
+import 'dof_calculator_screen.dart';
+import 'electricity_screen.dart';
+import 'exposure_screen.dart';
+import 'flicker_screen.dart';
 import 'light_screen.dart';
 import 'nd_quick_screen.dart';
+import 'optics_screen.dart';
 import 'shots_log_screen.dart';
 import 'solar_screen.dart';
+import 'storage_screen.dart';
 import 'viewfinder_screen.dart';
-import '../data/camera_selection.dart';
 
+/// Una herramienta del menú.
+class _Tool {
+  final String title;
+  final String detail;
+  final IconData icon;
+  final WidgetBuilder open;
+
+  const _Tool({
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.open,
+  });
+}
+
+/// Un departamento: agrupa las herramientas de la misma familia.
+class _Department {
+  final String name;
+  final String purpose;
+  final Color color;
+  final List<_Tool> tools;
+
+  const _Department({
+    required this.name,
+    required this.purpose,
+    required this.color,
+    required this.tools,
+  });
+}
+
+/// Menú principal, ordenado por departamentos como en un set.
 class DashboardScreen extends StatelessWidget {
   final CameraSelection selection;
 
@@ -25,12 +58,135 @@ class DashboardScreen extends StatelessWidget {
   bool get isFilm => selection.isFilm;
   double get coc => selection.cocMm;
 
+  List<_Department> get _departments => [
+        _Department(
+          name: 'CÁMARA Y ÓPTICA',
+          purpose: 'encuadre, foco y filtros',
+          color: OnSetColors.camera,
+          tools: [
+            _Tool(
+              title: 'VISOR DE CÁMARA',
+              detail: 'encuadre real sobre la imagen del teléfono',
+              icon: Icons.camera_alt_outlined,
+              open: (context) => const ViewfinderScreen(),
+            ),
+            _Tool(
+              title: 'ÓPTICA / FOV',
+              detail: 'campo de visión y equivalencia de lentes',
+              icon: Icons.crop_free,
+              open: (context) => const OpticsScreen(),
+            ),
+            _Tool(
+              title: 'PROFUNDIDAD DE CAMPO',
+              detail: 'hiperfocal y zona nítida',
+              icon: Icons.center_focus_strong_outlined,
+              open: (context) => const DofCalculatorScreen(),
+            ),
+            _Tool(
+              title: 'ND RÁPIDO',
+              detail: 'qué filtro volver a tu diafragma',
+              icon: Icons.filter_tilt_shift,
+              open: (context) => const NdQuickScreen(),
+            ),
+          ],
+        ),
+        _Department(
+          name: 'IMAGEN Y EXPOSICIÓN',
+          purpose: 'la luz que llega al sensor',
+          color: OnSetColors.image,
+          tools: [
+            _Tool(
+              title: 'SISTEMA DE ZONAS / EXPO',
+              detail: 'zonas, fall-off, compensar y fotometría',
+              icon: Icons.exposure_outlined,
+              open: (context) => const ExpoFotoTabs(),
+            ),
+            _Tool(
+              title: 'FLICKER Y PARPADEO',
+              detail: 'obturadores seguros para la red eléctrica',
+              icon: Icons.light_mode_outlined,
+              open: (context) => const FlickerScreen(),
+            ),
+          ],
+        ),
+        _Department(
+          name: 'LUZ Y ELÉCTRICO',
+          purpose: 'fuentes, energía y color',
+          color: OnSetColors.power,
+          tools: [
+            _Tool(
+              title: 'ELECTRICIDAD Y ENERGÍA',
+              detail: 'carga, cables y generador',
+              icon: Icons.bolt_outlined,
+              open: (context) => const ElectricityScreen(),
+            ),
+            _Tool(
+              title: 'DISTRO ELÉCTRICA',
+              detail: 'reparto de cargas entre fases',
+              icon: Icons.electrical_services,
+              open: (context) => const DistroScreen(),
+            ),
+            _Tool(
+              title: 'COLOR Y GELES',
+              detail: 'temperatura, mireds y gelatinas',
+              icon: Icons.palette_outlined,
+              open: (context) => const ColorScreen(),
+            ),
+            _Tool(
+              title: 'LUZ SOLAR',
+              detail: 'hora azul, dorada y posición del sol',
+              icon: Icons.wb_twilight,
+              open: (context) => const SolarScreen(),
+            ),
+          ],
+        ),
+        _Department(
+          name: 'DATA Y PRODUCCIÓN',
+          purpose: 'material y registro del rodaje',
+          color: OnSetColors.data,
+          tools: [
+            _Tool(
+              title: isFilm ? 'CHASIS Y METRAJE' : 'DATA Y ALMACENAMIENTO',
+              detail: isFilm ? 'pies, tiempo y chasis' : 'códecs, espacio y copia DIT',
+              icon: isFilm ? Icons.movie_creation_outlined : Icons.sd_storage_outlined,
+              open: (context) => const StorageScreen(),
+            ),
+            _Tool(
+              title: 'PLANOS Y NOTAS',
+              detail: 'configuraciones guardadas y anotaciones',
+              icon: Icons.fact_check_outlined,
+              open: (context) => const ShotsLogScreen(),
+            ),
+          ],
+        ),
+        _Department(
+          name: 'UTILIDADES',
+          purpose: 'lo que se usa todo el tiempo',
+          color: OnSetColors.tools,
+          tools: [
+            _Tool(
+              title: 'CALCULADORA DE CINE',
+              detail: 'fracciones, inversas y pasos',
+              icon: Icons.calculate_outlined,
+              open: (context) => const CineCalculatorScreen(),
+            ),
+            _Tool(
+              title: 'LINTERNA',
+              detail: 'pantalla blanca y flash del teléfono',
+              icon: Icons.flashlight_on_outlined,
+              open: (context) => const LightScreen(),
+            ),
+          ],
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
+    final departments = _departments;
     return Scaffold(
-      backgroundColor: OnSetColors.background, // Fondo principal oscuro
+      backgroundColor: OnSetColors.background,
       appBar: AppBar(
-        backgroundColor: OnSetColors.background, // AppBar oscuro
+        backgroundColor: OnSetColors.background,
         elevation: 0,
         title: const Text(
           'ON SET PRO',
@@ -57,289 +213,155 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      // Cambiado a SingleChildScrollView para evitar errores de desbordamiento
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Tarjeta de información geométrica y simple (Estilo Dark Mode)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.black, // Fondo de la tarjeta en negro puro
-                border: Border.all(
-                  color: Colors.white,
-                  width: 2,
-                ), // Borde blanco
-                borderRadius: BorderRadius.zero, // Bordes afilados
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'CÁMARA ACTIVA',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.0,
-                      color: Colors.white, // Texto en blanco
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'FORMATO: ${sensorName.toUpperCase()}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white, // Texto en blanco
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'TIPO: ${isFilm ? "PELÍCULA" : "DIGITAL"}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white54, // Blanco sutil para jerarquía
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'CoC: ${coc.toStringAsFixed(4)} mm',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white54, // Blanco sutil para jerarquía
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-            const Text(
-              'HERRAMIENTAS',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.white, // Título en blanco
-                letterSpacing: 2.0,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 1. PROFUNDIDAD DE CAMPO
-            _buildDashboardCard(
-              title: 'PROFUNDIDAD DE CAMPO',
-              icon: Icons.center_focus_strong_outlined,
-              accent: OnSetColors.camera,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DofCalculatorScreen(),
-                  ),
-                );
-              },
-            ),
-
-            // 2. SISTEMA DE ZONAS / EXPO
-            _buildDashboardCard(
-              title: 'SISTEMA DE ZONAS / EXPO',
-              icon: Icons.exposure_outlined,
-              accent: OnSetColors.image,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ExpoFotoTabs()),
-                );
-              },
-            ),
-
-            // 3. ELECTRICIDAD Y ENERGÍA
-            _buildDashboardCard(
-              title: 'ELECTRICIDAD Y ENERGÍA',
-              icon: Icons.bolt_outlined,
-              accent: OnSetColors.power,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ElectricityScreen(),
-                  ),
-                );
-              },
-            ),
-
-            // 4. DATA Y ALMACENAMIENTO (Cambia dinámicamente según isFilm)
-            _buildDashboardCard(
-              title: isFilm ? 'CHASIS Y METRAJE' : 'DATA Y ALMACENAMIENTO',
-              icon: isFilm
-                  ? Icons.movie_creation_outlined
-                  : Icons.sd_storage_outlined,
-              accent: OnSetColors.data,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const StorageScreen(),
-                  ),
-                );
-              },
-            ),
-
-            // 6. FLICKER / PARPADEO
-            _buildDashboardCard(
-              title: 'FLICKER Y PARPADEO',
-              icon: Icons.light_mode_outlined,
-              accent: OnSetColors.image,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const FlickerScreen(),
-                  ),
-                );
-              },
-            ),
-            // 7. COLOR Y TEMPERATURA
-            _buildDashboardCard(
-              title: 'COLOR Y GELES (MIREDS)',
-              icon: Icons.palette_outlined,
-              accent: OnSetColors.power,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ColorScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'VISOR DE CÁMARA',
-              icon: Icons.camera_alt_outlined,
-              accent: OnSetColors.camera,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ViewfinderScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'ND RÁPIDO',
-              icon: Icons.filter_tilt_shift,
-              accent: OnSetColors.camera,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NdQuickScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'LUZ SOLAR',
-              icon: Icons.wb_twilight,
-              accent: OnSetColors.tools,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SolarScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'DISTRO ELÉCTRICA',
-              icon: Icons.electrical_services,
-              accent: OnSetColors.power,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const DistroScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'PLANOS Y NOTAS',
-              icon: Icons.fact_check_outlined,
-              accent: OnSetColors.tools,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ShotsLogScreen()),
-                );
-              },
-            ),
-            _buildDashboardCard(
-              title: 'LINTERNA',
-              icon: Icons.flashlight_on_outlined,
-              accent: OnSetColors.tools,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LightScreen()),
-                );
-              },
-            ),
-            // 8. ÓPTICA Y FOV
-            _buildDashboardCard(
-              title: 'ÓPTICA / FOV (LENS MATCHER)',
-              icon: Icons.camera_outlined,
-              accent: OnSetColors.camera,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OpticsScreen(),
-                  ),
-                );
-              },
-            ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+        children: [
+          _cameraCard(),
+          const SizedBox(height: 26),
+          for (final department in departments) ...[
+            _departmentHeader(department),
+            const SizedBox(height: 10),
+            for (final tool in department.tools) _toolCard(tool, department.color),
+            const SizedBox(height: 24),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  // --- WIDGET ACTUALIZADO PARA MODO OSCURO ---
-  Widget _buildDashboardCard({
-    required String title,
-    required IconData icon,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: OnSetColors.surface, // Gris oscuro característico
-            borderRadius: BorderRadius.zero,
-            border: Border(
-              left: BorderSide(color: accent, width: 4),
-              top: BorderSide(color: Colors.white12, width: 1),
-              right: BorderSide(color: Colors.white12, width: 1),
-              bottom: BorderSide(color: Colors.white12, width: 1),
+  Widget _cameraCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(color: Colors.white, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'CÁMARA ACTIVA',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.0,
+              color: Colors.white,
+              fontSize: 10,
             ),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
-          child: Row(
+          const SizedBox(height: 10),
+          Text(
+            sensorName.toUpperCase(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${isFilm ? "PELÍCULA" : "DIGITAL"} · '
+            '${selection.widthMm.toStringAsFixed(2)} × ${selection.heightMm.toStringAsFixed(2)} mm · '
+            'CoC ${coc.toStringAsFixed(4)} mm',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white54,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _departmentHeader(_Department department) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(width: 3, height: 26, color: department.color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: accent, size: 28),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
+              Text(
+                department.name,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.8,
+                  color: department.color,
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white54, // Flecha en blanco sutil
-                size: 16,
+              const SizedBox(height: 2),
+              Text(
+                department.purpose,
+                style: const TextStyle(fontSize: 9, color: Colors.white38),
               ),
             ],
+          ),
+        ),
+        Text(
+          '${department.tools.length}',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: department.color.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _toolCard(_Tool tool, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Builder(
+        builder: (context) => InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: tool.open),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: OnSetColors.surface,
+              border: Border(
+                left: BorderSide(color: accent, width: 3),
+                top: BorderSide(color: Colors.white10),
+                right: BorderSide(color: Colors.white10),
+                bottom: BorderSide(color: Colors.white10),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+            child: Row(
+              children: [
+                Icon(tool.icon, color: accent, size: 22),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tool.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        tool.detail,
+                        style: const TextStyle(fontSize: 9, color: Colors.white38),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 13),
+              ],
+            ),
           ),
         ),
       ),
