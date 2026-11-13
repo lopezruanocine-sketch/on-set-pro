@@ -69,16 +69,16 @@ class DashboardScreen extends StatelessWidget {
               open: (context) => const ViewfinderScreen(),
             ),
             _Tool(
-              title: 'ÓPTICA / FOV',
-              detail: 'campo de visión y equivalencia de lentes',
-              icon: Icons.crop_free,
-              open: (context) => const OpticsScreen(),
-            ),
-            _Tool(
               title: 'PROFUNDIDAD DE CAMPO',
               detail: 'hiperfocal y zona nítida',
               icon: Icons.center_focus_strong_outlined,
               open: (context) => const DofCalculatorScreen(),
+            ),
+            _Tool(
+              title: 'ÓPTICA / FOV',
+              detail: 'campo de visión y equivalencia de lentes',
+              icon: Icons.crop_free,
+              open: (context) => const OpticsScreen(),
             ),
           ],
         ),
