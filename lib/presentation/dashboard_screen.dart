@@ -5,13 +5,11 @@ import '../theme/app_theme.dart';
 import 'camera_setup_screen.dart';
 import 'cine_calculator_screen.dart';
 import 'color_screen.dart';
-import 'distro_screen.dart';
 import 'dof_calculator_screen.dart';
 import 'electricity_screen.dart';
 import 'exposure_screen.dart';
 import 'flicker_screen.dart';
 import 'light_screen.dart';
-import 'nd_quick_screen.dart';
 import 'optics_screen.dart';
 import 'shots_log_screen.dart';
 import 'solar_screen.dart';
@@ -82,12 +80,6 @@ class DashboardScreen extends StatelessWidget {
               icon: Icons.center_focus_strong_outlined,
               open: (context) => const DofCalculatorScreen(),
             ),
-            _Tool(
-              title: 'ND RÁPIDO',
-              detail: 'qué filtro volver a tu diafragma',
-              icon: Icons.filter_tilt_shift,
-              open: (context) => const NdQuickScreen(),
-            ),
           ],
         ),
         _Department(
@@ -115,16 +107,10 @@ class DashboardScreen extends StatelessWidget {
           color: OnSetColors.power,
           tools: [
             _Tool(
-              title: 'ELECTRICIDAD Y ENERGÍA',
-              detail: 'carga, cables y generador',
+              title: 'ELÉCTRICO',
+              detail: 'circuito y reparto de cargas por fase',
               icon: Icons.bolt_outlined,
               open: (context) => const ElectricityScreen(),
-            ),
-            _Tool(
-              title: 'DISTRO ELÉCTRICA',
-              detail: 'reparto de cargas entre fases',
-              icon: Icons.electrical_services,
-              open: (context) => const DistroScreen(),
             ),
             _Tool(
               title: 'COLOR Y GELES',

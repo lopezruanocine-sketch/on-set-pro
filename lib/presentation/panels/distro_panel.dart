@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
-import '../domain/power/distro.dart';
-import '../theme/app_theme.dart';
+import '../../domain/power/distro.dart';
+import '../../theme/app_theme.dart';
 
 /// Reparto de cargas en una distro trifásica.
-class DistroScreen extends StatefulWidget {
-  const DistroScreen({super.key});
+///
+/// Vive como pestaña dentro de Electricidad: es la misma pregunta
+/// (¿cuánta corriente tengo?) con varias cargas repartidas en fases.
+class DistroPanel extends StatefulWidget {
+  const DistroPanel({super.key});
 
   @override
-  State<DistroScreen> createState() => _DistroScreenState();
+  State<DistroPanel> createState() => _DistroPanelState();
 }
 
-class _DistroScreenState extends State<DistroScreen> {
+class _DistroPanelState extends State<DistroPanel> {
   final List<_DistroLoad> loads = [
     _DistroLoad(name: 'M18', watts: 1800),
     _DistroLoad(name: 'M18', watts: 1800),
@@ -31,23 +34,7 @@ class _DistroScreenState extends State<DistroScreen> {
     );
     final imbalance = DistroEngine.imbalancePercent(plan.phaseWatts);
 
-    return Scaffold(
-      backgroundColor: OnSetColors.background,
-      appBar: AppBar(
-        backgroundColor: OnSetColors.background,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'DISTRO ELÉCTRICA',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
-            fontSize: 14,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
+    return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -76,14 +63,13 @@ class _DistroScreenState extends State<DistroScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'La corriente se calcula con la tensión de fase (${"tensión"} / √3) porque cada '
+              'La corriente se calcula con la tensión de fase (tensión / √3) porque cada '
               'luminaria va entre fase y neutro. El reparto no corrige térmicas ni cables: '
-              'eso se revisa en Electricidad.',
+              'eso se revisa en la otra pestaña.',
               style: TextStyle(fontSize: 9, color: Colors.white38, height: 1.4),
             ),
           ],
         ),
-      ),
     );
   }
 

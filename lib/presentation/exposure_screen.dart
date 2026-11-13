@@ -551,6 +551,9 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
                 stops: result.stops,
                 title: 'CORRECCIÓN NECESARIA',
                 subtitle: _compensationSubtitle(result),
+                ndHint: result.stops < -0.2
+                    ? CameraFilters.closestNd(result.stops)?.name.split(' — ').first
+                    : null,
               ),
               const SizedBox(height: 16),
               _breakdown(result, shot),
@@ -1126,6 +1129,7 @@ Widget _resultCard({
   required double stops,
   required String title,
   String? subtitle,
+  String? ndHint,
 }) {
   final balanced = stops.abs() < 0.05;
   final accent = balanced
@@ -1157,6 +1161,24 @@ Widget _resultCard({
             subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 11, color: Colors.white54, height: 1.4),
+          ),
+        ],
+        if (ndHint != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: OnSetColors.danger.withValues(alpha: 0.6)),
+            ),
+            child: Text(
+              'O PONÉ $ndHint',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                color: OnSetColors.danger,
+              ),
+            ),
           ),
         ],
       ],

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:on_set_pro/data/camera_selection.dart';
 import 'package:on_set_pro/presentation/dashboard_screen.dart';
-import 'package:on_set_pro/presentation/nd_quick_screen.dart';
+import 'package:on_set_pro/presentation/exposure_screen.dart';
 import 'package:on_set_pro/state/shot_state.dart';
 
 void main() {
@@ -42,11 +42,9 @@ void main() {
       'VISOR DE CÁMARA',
       'ÓPTICA / FOV',
       'PROFUNDIDAD DE CAMPO',
-      'ND RÁPIDO',
       'SISTEMA DE ZONAS / EXPO',
       'FLICKER Y PARPADEO',
-      'ELECTRICIDAD Y ENERGÍA',
-      'DISTRO ELÉCTRICA',
+      'ELÉCTRICO',
       'COLOR Y GELES',
       'LUZ SOLAR',
       'DATA Y ALMACENAMIENTO',
@@ -67,10 +65,10 @@ void main() {
 
   testWidgets('tocar una herramienta la abre', (tester) async {
     await pump(tester);
-    await tester.scrollUntilVisible(find.text('ND RÁPIDO'), 200);
-    await tester.tap(find.text('ND RÁPIDO'));
+    await tester.scrollUntilVisible(find.text('SISTEMA DE ZONAS / EXPO'), 200);
+    await tester.tap(find.text('SISTEMA DE ZONAS / EXPO'));
     await tester.pumpAndSettle();
-    expect(find.byType(NdQuickScreen), findsOneWidget);
+    expect(find.byType(ExpoFotoTabs), findsOneWidget);
   });
 
   testWidgets('en modo fílmico la tarjeta de data cambia de nombre', (tester) async {

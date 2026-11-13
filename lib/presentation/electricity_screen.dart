@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/catalogs/cables.dart';
 import '../domain/power/power_engine.dart';
 import '../theme/app_theme.dart';
+import 'panels/distro_panel.dart';
 
 enum PowerSource { tieIn, generator, battery }
 
@@ -47,14 +48,51 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: OnSetColors.background,
+        appBar: AppBar(
+          backgroundColor: OnSetColors.background,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'ELÉCTRICO',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2.0,
+              fontSize: 14,
+            ),
+          ),
+          bottom: const TabBar(
+            indicatorColor: OnSetColors.power,
+            labelColor: OnSetColors.power,
+            unselectedLabelColor: Colors.white38,
+            tabs: [
+              Tab(text: 'CIRCUITO'),
+              Tab(text: 'FASES'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _circuitTab(),
+            const DistroPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pestaña de un solo circuito: soporte, carga, cable y combustible.
+  Widget _circuitTab() {
     final isBattery = source == PowerSource.battery;
     final activeVoltage = isBattery ? batteryVoltage : voltage;
-
     final amps = isBattery
         ? totalWatts / activeVoltage
         : PowerEngine.amps(watts: totalWatts, voltage: activeVoltage, phases: phases);
 
-    // Capacidad real del soporte.
     double capacityAmps;
     GeneratorCapacity? generator;
     if (isBattery) {
@@ -77,61 +115,44 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
     final loadRatio = capacityAmps <= 0 ? 0.0 : amps / capacityAmps;
     final color = _semaforo(loadRatio);
 
-    return Scaffold(
-      backgroundColor: OnSetColors.background,
-      appBar: AppBar(
-        backgroundColor: OnSetColors.background,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'ELECTRICIDAD Y ENERGÍA',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2.0,
-            fontSize: 14,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sourceSelector(),
+          const SizedBox(height: 25),
+          _semaforoCard(loadRatio, color, amps, capacityAmps, isBattery, generator),
+          const SizedBox(height: 30),
+          _sectionTitle('1. CAPACIDAD DEL SOPORTE'),
+          if (isBattery) ..._batteryCapacity() else ..._mainsCapacity(),
+          const SizedBox(height: 30),
+          _sectionTitle('2. CARGA A CONECTAR'),
+          _numberInput(
+            'TOTAL WATTS (W)',
+            totalWatts,
+            (v) => setState(() => totalWatts = v),
+            highlight: true,
           ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sourceSelector(),
-            const SizedBox(height: 25),
-            _semaforoCard(loadRatio, color, amps, capacityAmps, isBattery, generator),
-            const SizedBox(height: 30),
-            _sectionTitle('1. CAPACIDAD DEL SOPORTE'),
-            if (isBattery) ..._batteryCapacity() else ..._mainsCapacity(),
-            const SizedBox(height: 30),
-            _sectionTitle('2. CARGA A CONECTAR'),
-            _numberInput(
-              'TOTAL WATTS (W)',
-              totalWatts,
-              (v) => setState(() => totalWatts = v),
-              highlight: true,
-            ),
-            const SizedBox(height: 15),
-            Text(
-              isBattery
-                  ? 'A ${activeVoltage.toStringAsFixed(1)} V consume ${amps.toStringAsFixed(1)} A'
-                  : '${amps.toStringAsFixed(1)} A a ${activeVoltage.toStringAsFixed(0)} V '
-                      '${phases == Phases.three ? "trifásico" : "monofásico"}',
-              style: const TextStyle(fontSize: 11, color: Colors.white54),
-            ),
-            if (!isBattery) ...[
-              const SizedBox(height: 35),
-              _sectionTitle('3. TENDIDO DE CABLES'),
-              _cableSection(amps),
-            ],
-            if (source == PowerSource.generator) ...[
-              const SizedBox(height: 35),
-              _sectionTitle('4. LOGÍSTICA DE COMBUSTIBLE'),
-              _fuelModule(),
-            ],
+          const SizedBox(height: 15),
+          Text(
+            isBattery
+                ? 'A ${activeVoltage.toStringAsFixed(1)} V consume ${amps.toStringAsFixed(1)} A'
+                : '${amps.toStringAsFixed(1)} A a ${activeVoltage.toStringAsFixed(0)} V '
+                    '${phases == Phases.three ? "trifásico" : "monofásico"}',
+            style: const TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+          if (!isBattery) ...[
+            const SizedBox(height: 35),
+            _sectionTitle('3. TENDIDO DE CABLES'),
+            _cableSection(amps),
           ],
-        ),
+          if (source == PowerSource.generator) ...[
+            const SizedBox(height: 35),
+            _sectionTitle('4. LOGÍSTICA DE COMBUSTIBLE'),
+            _fuelModule(),
+          ],
+        ],
       ),
     );
   }
