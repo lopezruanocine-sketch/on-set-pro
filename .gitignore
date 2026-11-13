@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Distribución de prueba (se regenera con flutter build web)
+/dist/
