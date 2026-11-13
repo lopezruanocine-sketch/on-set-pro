@@ -7,6 +7,7 @@ import '../core/localization.dart';
 import '../core/pro_input.dart';
 import '../data/catalogs/camera_filters.dart';
 import '../data/catalogs/light_gels.dart';
+import '../data/shots_repository.dart';
 import '../domain/exposure/exposure_engine.dart';
 import '../domain/exposure/exposure_recipes.dart';
 import '../state/shot_state.dart';
@@ -555,10 +556,88 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               _breakdown(result, shot),
               const SizedBox(height: 16),
               _recipes(result, shot),
+              const SizedBox(height: 20),
+              _savePlanButton(),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _savePlanButton() {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: OnSetColors.surface,
+        foregroundColor: OnSetColors.brand,
+        elevation: 0,
+        side: const BorderSide(color: OnSetColors.brand),
+        minimumSize: const Size(double.infinity, 50),
+      ),
+      onPressed: _savePlan,
+      child: const Text(
+        'GUARDAR PLANO',
+        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5),
+      ),
+    );
+  }
+
+  Future<void> _savePlan() async {
+    final shot = ShotState.instance;
+    final camera = shot.camera;
+    if (camera == null) return;
+    final meter = MeterReading(
+      aperture: meteredF,
+      iso: camera.baseIso ?? 800,
+      fps: 24,
+      shutterAngle: 180,
+    );
+    final result = ExposureEngine.compensate(
+      meter: meter,
+      camera: shot.settingsFor(desiredF),
+    );
+    final question = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: OnSetColors.surface,
+        title: const Text('Guardar plano', style: TextStyle(fontSize: 15, color: Colors.white)),
+        content: TextField(
+          controller: question,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: const InputDecoration(
+            hintText: 'Nota opcional: escena, toma, para qué es…',
+            hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCELAR', style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('GUARDAR', style: TextStyle(color: OnSetColors.brand, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (saved != true) return;
+    await ShotsRepository.instance.savePlan(
+      camera: camera,
+      iso: shot.iso,
+      fps: shot.fps,
+      shutterAngle: shot.shutterAngle,
+      filters: shot.cameraFilters,
+      gels: shot.gels,
+      meterReading: meteredF,
+      correctionStops: result.stops,
+      note: question.text.trim().isEmpty ? null : question.text.trim(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Plano guardado en PLANOS Y NOTAS.')),
     );
   }
 

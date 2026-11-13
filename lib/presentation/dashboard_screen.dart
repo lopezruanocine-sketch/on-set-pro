@@ -8,6 +8,8 @@ import 'color_screen.dart';
 import 'optics_screen.dart';
 import '../theme/app_theme.dart';
 import 'camera_setup_screen.dart';
+import 'light_screen.dart';
+import 'shots_log_screen.dart';
 import '../data/camera_selection.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -201,6 +203,28 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ColorScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'PLANOS Y NOTAS',
+              icon: Icons.fact_check_outlined,
+              accent: OnSetColors.tools,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ShotsLogScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'LINTERNA',
+              icon: Icons.flashlight_on_outlined,
+              accent: OnSetColors.tools,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LightScreen()),
                 );
               },
             ),
