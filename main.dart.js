@@ -28530,20 +28530,21 @@ aPu(a,b){var s=null
 return B.aK(B.b([B.a7(s,s,A.F,s,s,new B.ae(a,s,s,s,s,s,A.jx),s,8,s,s,s,s,8),A.hl,B.J(b,s,s,s,s,A.e1,s,s)],t.p),A.O,A.H,A.G,s)},
 aIf(a,b,c){var s,r,q,p,o,n,m,l=null,k=Math.abs(a),j=k<0.05
 if(j)s=A.ea
-else s=a<0?A.b8:A.aa
+else s=a>0?A.b8:A.aa
 r=A.n.D(k,1)
 q=B.cw(r,".",",")
-p=a<0?"SUM\xc1 "+q+" PASOS":"QUIT\xc1 "+q+" PASOS"
-r=B.d4(24)
-o=B.aR(s,1.5)
-n=B.J(c,l,l,l,l,A.b5R,l,l)
+r=a>0
+p=r?"SUM\xc1 "+q+" PASOS":"QUIT\xc1 "+q+" PASOS"
+o=B.d4(24)
+n=B.aR(s,1.5)
+m=B.J(c,l,l,l,l,A.b5R,l,l)
 if(j)k="OK"
-else{m=a>0?"+":"\u2212"
-k=m+A.n.D(k,1)+" PASOS"}m=t.p
-k=B.b([n,A.b3,B.J(k,l,l,l,l,B.bo(l,l,s,l,l,l,l,l,l,l,l,48,l,l,A.ce,l,l,!0,l,l,l,l,l,l,l,l),l,l)],m)
-if(!j){n=B.aR(A.ac,1)
-A.l.M(k,B.b([A.d9,B.a7(l,B.J(p,l,l,l,l,A.b4c,l,l),A.F,l,l,new B.ae(l,l,n,l,l,l,A.R),l,l,l,A.Vt,l,l,l)],m))}if(b!=null)A.l.M(k,B.b([A.bN,B.J(b,l,l,l,l,A.b5F,A.aV,l)],m))
-return B.a7(l,B.aC(k,A.O,A.H,A.G),A.F,l,l,new B.ae(A.ae,l,o,r,l,l,A.R),l,l,l,A.VE,l,l,1/0)},
+else{r=r?"+":"\u2212"
+k=r+A.n.D(k,1)+" PASOS"}r=t.p
+k=B.b([m,A.b3,B.J(k,l,l,l,l,B.bo(l,l,s,l,l,l,l,l,l,l,l,48,l,l,A.ce,l,l,!0,l,l,l,l,l,l,l,l),l,l)],r)
+if(!j){m=B.aR(A.ac,1)
+A.l.M(k,B.b([A.d9,B.a7(l,B.J(p,l,l,l,l,A.b4c,l,l),A.F,l,l,new B.ae(l,l,m,l,l,l,A.R),l,l,l,A.Vt,l,l,l)],r))}if(b!=null)A.l.M(k,B.b([A.bN,B.J(b,l,l,l,l,A.b5F,A.aV,l)],r))
+return B.a7(l,B.aC(k,A.O,A.H,A.G),A.F,l,l,new B.ae(A.ae,l,n,o,l,l,A.R),l,l,l,A.VE,l,l,1/0)},
 Kr(a,b,c,d,e,f){var s=null,r=B.J(a,s,s,s,s,A.f3,s,s),q=B.d4(8),p=A.l.t(c,b)?b:A.l.gT(c),o=B.S(c).h("R<1,df<w>>")
 o=B.U(new B.R(c,new B.aDK(e,f),o),o.h("ab.E"))
 return B.aC(B.b([r,A.at,B.a7(s,new B.fU(B.kt(A.aS,s,s,!0,o,new B.aDL(d),p,t.i),s),A.F,s,s,new B.ae(A.ae,s,s,q,s,s,A.R),s,s,s,A.eb,s,s,s)],t.p),A.ai,A.H,A.G)},
@@ -95413,7 +95414,7 @@ r=k-s
 m=A.z.aV(A.n.ar(s),0,10)
 q=r<-0.15?B.aFJ(r):p
 l=t.p
-m=B.b([B.J("PLANO: "+o.gyn(),p,p,p,p,A.rE,p,p),A.ek,B.aK(B.b([B.b7(B.Kr("f/ EN C\xc1MARA",n.d,A.eL,new B.aDl(n),!0,""),1),A.j8,B.b7(new B.tI("LECTURA FOT\xd3METRO",n.e,new B.aDm(n),"f/ ",p),1)],l),A.O,A.H,A.G,p),A.rk,A.b8B,A.b3,n.apl(m),A.bN,B.aK(B.b([B.aPu(A.mh,"LA LECTURA CAE AC\xc1"),A.b1G,B.aPu(A.aa,"ZONA DESTINO")],l),A.O,A.H,A.G,p),A.cR,B.aIf(-r,n.apm(new B.aoe(s,m,r),q),"C\xd3MO EST\xc1 LA ESCENA")],l)
+m=B.b([B.J("PLANO: "+o.gyn(),p,p,p,p,A.rE,p,p),A.ek,B.aK(B.b([B.b7(B.Kr("f/ EN C\xc1MARA",n.d,A.eL,new B.aDl(n),!0,""),1),A.j8,B.b7(new B.tI("LECTURA FOT\xd3METRO",n.e,new B.aDm(n),"f/ ",p),1)],l),A.O,A.H,A.G,p),A.rk,A.b8B,A.b3,n.apl(m),A.bN,B.aK(B.b([B.aPu(A.mh,"LA LECTURA CAE AC\xc1"),A.b1G,B.aPu(A.aa,"ZONA DESTINO")],l),A.O,A.H,A.G,p),A.cR,B.aIf(r,n.apm(new B.aoe(s,m,r),q),"INSTRUCCI\xd3N PARA ILUMINACI\xd3N")],l)
 if(q!=null)A.l.M(m,B.b([A.b3,B.J("O resolvelo con "+q.a,p,p,p,p,A.mW,p,p)],l))
 return B.fI(B.aC(m,A.ai,A.H,A.G),p,A.V,A.ib,p,A.aK)},
 $S:101}
@@ -95470,11 +95471,12 @@ m=o?0.3:0.1
 l=o?100:30
 o=o?"ft":"m"
 n=B.Q1(A.mh,!0,"NUEVA DISTANCIA",l,m,new B.av9(k),o,n)
-i=B.b([h,A.cQ,q,A.ek,p,n,A.cQ,B.aIf(i,i<0?"La fuente pierde "+A.n.D(Math.abs(i),1)+" stops al alejarse. Abr\xed ese diafragma, sub\xed la intensidad o acerc\xe1 la fuente.":"La fuente gana "+A.n.D(i,1)+" stops al acercarse. Cerr\xe1 el diafragma, baj\xe1 la intensidad o alej\xe1 la fuente.","LA LUZ CAMBIA")],r)
-if(k.e<1||k.d<1)A.l.M(i,B.b([A.b3,B.J("A menos de 1 m la ley inversa deja de ser exacta: el tama\xf1o de la fuente ya pesa.",j,j,j,j,A.mW,j,j)],r))
-i.push(A.b3)
-i.push(B.J("Vale para fuentes puntuales. Con difusores grandes, booklights o rebotes la ca\xedda es menor.",j,j,j,j,A.mW,j,j))
-return B.fI(B.aC(i,A.O,A.H,A.G),j,A.V,A.ib,j,A.aK)},
+o=i<0?"La fuente pierde "+A.n.D(Math.abs(i),1)+" stops al alejarse. Abr\xed ese diafragma, sub\xed la intensidad o acerc\xe1 la fuente.":"La fuente gana "+A.n.D(i,1)+" stops al acercarse. Cerr\xe1 el diafragma, baj\xe1 la intensidad o alej\xe1 la fuente."
+o=B.b([h,A.cQ,q,A.ek,p,n,A.cQ,B.aIf(-i,o,"LA LUZ CAMBIA")],r)
+if(k.e<1||k.d<1)A.l.M(o,B.b([A.b3,B.J("A menos de 1 m la ley inversa deja de ser exacta: el tama\xf1o de la fuente ya pesa.",j,j,j,j,A.mW,j,j)],r))
+o.push(A.b3)
+o.push(B.J("Vale para fuentes puntuales. Con difusores grandes, booklights o rebotes la ca\xedda es menor.",j,j,j,j,A.mW,j,j))
+return B.fI(B.aC(o,A.O,A.H,A.G),j,A.V,A.ib,j,A.aK)},
 ad_(a){var s=null,r=B.d4(16)
 return B.a7(s,B.BY(new B.av0(this,a)),A.F,s,s,new B.ae(A.ae,s,s,r,s,s,A.R),s,130,A.Vc,s,s,s,s)},
 Wm(a,b,c){var s=null,r=b?A.aS:A.a8,q=B.d4(20),p=B.aR(b?A.ac:A.be,1)
@@ -95667,7 +95669,7 @@ n=B.b([],t.Sc)
 for(m=h.e,l=m.length,k=0;k<m.length;m.length===l||(0,B.y)(m),++k){j=m[k]
 n.push(new B.a1(j.a,j.c))}m=t.KZ
 m=B.U(new B.dP(new B.aq(A.pn,new B.atP(),t.SW),new B.atQ(),m),m.h("G.E"))
-return B.fI(B.aC(B.b([f,A.cQ,r,A.b3,q,A.dY,p,A.cQ,o,A.at,B.b2O("Sin filtros delante del sensor.",n,"DELANTE DEL SENSOR",new B.atR(h),new B.atS(h),m),A.d9,g.adu(a,h),A.d9,new B.tI("FUENTE PRINCIPAL A (m)",h.w,new B.atT(h),"",i),A.bN,B.b2S(h),A.cR,B.aIf(-s.a,i,"DESBALANCE"),A.mP,g.a9L(s,h),A.mP,g.aaV(s,h),A.ek,B.aG8(A.b9_,g.gam4(),B.aG9(i,i,A.ae,i,i,i,0,i,i,A.aa,i,A.b1D,i,i,i,A.NY,i,i,i,i))],e),A.bv,A.H,A.G),i,A.V,A.ib,i,A.aK)},
+return B.fI(B.aC(B.b([f,A.cQ,r,A.b3,q,A.dY,p,A.cQ,o,A.at,B.b2O("Sin filtros delante del sensor.",n,"DELANTE DEL SENSOR",new B.atR(h),new B.atS(h),m),A.d9,g.adu(a,h),A.d9,new B.tI("FUENTE PRINCIPAL A (m)",h.w,new B.atT(h),"",i),A.bN,B.b2S(h),A.cR,B.aIf(s.a,i,"DESBALANCE"),A.mP,g.a9L(s,h),A.mP,g.aaV(s,h),A.ek,B.aG8(A.b9_,g.gam4(),B.aG9(i,i,A.ae,i,i,i,0,i,i,A.aa,i,A.b1D,i,i,i,A.NY,i,i,i,i))],e),A.bv,A.H,A.G),i,A.V,A.ib,i,A.aK)},
 $S:101}
 B.atL.prototype={
 $1(a){var s=this.a
