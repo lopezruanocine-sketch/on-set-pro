@@ -142,6 +142,21 @@ Cómo quedó implementado:
 - **El recetario entiende la estructura**: con 6 pasos de filtro puestos ya no propone ISO
   25600 ni f/0.4; propone **quitar el ND 1.2**, que es lo que haría un DP.
 
+### Mover la fuente (13/11/2026)
+
+El recetario ahora arranca por la herramienta que más se usa en set: **mover la luz**.
+
+- Se carga la distancia a la fuente principal ("FUENTE PRINCIPAL A (m)").
+- Con eso, el recetario propone **"Acercá la fuente a X m"** antes que tocar el diafragma o
+  el ISO. La distancia sale de la ley inversa: cada paso son un factor raíz de 2.
+- Si sobra luz, propone **"Alejá la fuente a X m"**.
+- Sólo propone distancias razonables (entre 0,2 y 40 m): si hay que mover la fuente 80 metros,
+  no es una receta, es otra escena.
+- Orden del recetario: mover la fuente → quitar un filtro → diafragma → ISO.
+
+Ejemplo: ND 0.6 + CTO sobre la base piden +2,7 stops; con la fuente a 2,5 m propone acercarla
+a **1,0 m** (o quitar el ND 0.6, o abrir a f/1.6).
+
 ---
 
 ## Estado de implementación (13/11/2026)

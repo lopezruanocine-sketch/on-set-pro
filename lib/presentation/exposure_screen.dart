@@ -534,6 +534,13 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
                 ),
                 onRemove: (i) => shot.removeGel(shot.gels[i]),
               ),
+              const SizedBox(height: 12),
+              _manualInput(
+                'FUENTE PRINCIPAL A (m)',
+                shot.keyLightDistanceM,
+                (v) => shot.setKeyLightDistance(v),
+                prefix: '',
+              ),
               const SizedBox(height: 10),
               _meterGelToggle(shot),
               const SizedBox(height: 12),
@@ -718,6 +725,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
       filters: [
         for (final f in shot.cameraFilters) (f.name, f.stops),
       ],
+      lightDistanceM: shot.keyLightDistanceM,
     );
 
     if (recipes.isEmpty) {
@@ -780,6 +788,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
         RecipeKind.shutter => 'OBTURADOR',
         RecipeKind.nd => 'PONER FILTRO',
         RecipeKind.removeFilter => 'QUITAR FILTRO',
+        RecipeKind.moveLight => 'MOVER LA FUENTE',
       };
 
   String _recipeValueLabel(ExposureRecipe recipe, double stops) {
@@ -797,6 +806,11 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
       case RecipeKind.removeFilter:
         final name = recipe.filterName ?? 'filtro';
         return 'Quitá ${name.split(' — ').first}';
+      case RecipeKind.moveLight:
+        final metres = recipe.value.toStringAsFixed(1);
+        return stops > 0
+            ? 'Acercá la fuente a $metres m'
+            : 'Alejá la fuente a $metres m';
     }
   }
 
@@ -1114,8 +1128,18 @@ Widget _dropdown(
   );
 }
 
-Widget _manualInput(String label, double val, Function(double) onChanged) {
-  return _ManualField(label: label, value: val, onChanged: onChanged);
+Widget _manualInput(
+  String label,
+  double val,
+  Function(double) onChanged, {
+  String prefix = 'f/ ',
+}) {
+  return _ManualField(
+    label: label,
+    value: val,
+    onChanged: onChanged,
+    prefix: prefix,
+  );
 }
 
 /// Campo numérico con su propio controlador: el anterior creaba uno nuevo en
@@ -1124,11 +1148,13 @@ class _ManualField extends StatefulWidget {
   final String label;
   final double value;
   final Function(double) onChanged;
+  final String prefix;
 
   const _ManualField({
     required this.label,
     required this.value,
     required this.onChanged,
+    this.prefix = 'f/ ',
   });
 
   @override
@@ -1171,10 +1197,10 @@ class _ManualFieldState extends State<_ManualField> {
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(color: Colors.white, fontSize: 16),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               border: InputBorder.none,
-              prefixText: "f/ ",
-              prefixStyle: TextStyle(color: Colors.white54),
+              prefixText: widget.prefix,
+              prefixStyle: const TextStyle(color: Colors.white54),
             ),
             onSubmitted: (v) {
               final n = double.tryParse(v);

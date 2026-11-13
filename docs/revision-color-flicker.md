@@ -44,6 +44,19 @@ Fecha: 13/11/2026 · Estado: **implementado y verificado**.
 - **Tocar una ventana la aplica al plano**, y ese obturador viaja a Exposición y a Fotometría.
 - Frecuencia de red 50/60 Hz y lectura en ángulo o en 1/x.
 
+## Los filtros de cámara entran en Color (13/11/2026)
+
+Un 85 o un 80A no sólo cuestan pasos: mueven el color de la imagen. El módulo de Color ahora
+los tiene en cuenta:
+
+- Muestra el corrimiento **a corregir**, que es la diferencia entre fuente y objetivo **menos**
+  lo que ya aportan los filtros de cámara.
+- Debajo del número grande aclara el desglose: "fuente → cámara: −134 mireds · filtros de
+  cámara: +112".
+- La gelatina recomendada se calcula sobre ese corrimiento neto.
+- Si ninguna gelatina alcanza (por ejemplo un 85 con la cámara balanceada en diurno), avisa:
+  "los filtros de cámara aportan +112 mireds; revisá si ese filtro corresponde al objetivo".
+
 ## Verificado
 
 - 3200 K contra 5600 K: −133 mireds → Rosco 3202 Full CTB (queda en 5510 K, error 3 mireds,

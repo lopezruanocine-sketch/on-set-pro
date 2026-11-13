@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import '../../data/catalogs/camera_filters.dart';
 
 /// Tipo de solución que propone el recetario.
-enum RecipeKind { aperture, iso, shutter, nd, removeFilter }
+enum RecipeKind { aperture, iso, shutter, nd, removeFilter, moveLight }
 
 /// Una alternativa concreta para resolver la corrección de exposición.
 class ExposureRecipe {
@@ -40,12 +40,22 @@ class ExposureRecipes {
     required List<double> apertureScale,
     required List<double> isoScale,
     List<(String, double)> filters = const [],
+    double? lightDistanceM,
     int limit = 3,
   }) {
     if (stops.abs() < 0.05) return const [];
 
     final recipes = <ExposureRecipe>[];
     final big = stops.abs() > 2.5;
+
+    // Mover la fuente es la primera herramienta del eléctrico y del DP:
+    // cada paso son un factor raíz de 2 en distancia (ley inversa).
+    if (lightDistanceM != null && lightDistanceM > 0) {
+      final newDistance = lightDistanceM / math.pow(2, stops / 2);
+      if (newDistance >= 0.2 && newDistance <= 40) {
+        recipes.add(ExposureRecipe(kind: RecipeKind.moveLight, value: newDistance));
+      }
+    }
 
     // Cuando el desajuste es grande, lo primero es cambiar la estructura
     // (sacar un filtro o poner uno), no forzar ISO o diafragma al extremo.

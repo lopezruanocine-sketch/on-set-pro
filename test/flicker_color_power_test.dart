@@ -81,6 +81,22 @@ void main() {
       expect(options, isEmpty);
     });
 
+    test('un filtro 85 en la cámara cambia la gelatina que hace falta', () {
+      final sinFiltro = GelAdvisor.recommend(
+        sourceKelvin: 5600,
+        targetKelvin: 5600,
+      );
+      final con85 = GelAdvisor.recommend(
+        sourceKelvin: 5500,
+        targetKelvin: 5600,
+        cameraMired: 112,
+      );
+      // Sin filtro casi no hay nada que corregir; con 85 hay que enfriar.
+      expect(sinFiltro, isEmpty);
+      expect(con85, isNotEmpty);
+      expect(con85.first.gel.family, GelFamily.ctb);
+    });
+
     test('el catálogo tiene gelatinas con mired y difusiones sin mired', () {
       expect(LightGels.withMired.length, greaterThan(15));
       expect(LightGels.all.any((g) => g.family == GelFamily.diffusion), isTrue);

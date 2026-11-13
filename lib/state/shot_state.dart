@@ -35,6 +35,10 @@ class ShotState extends ChangeNotifier {
   /// en ese caso no se vuelven a descontar.
   bool meterIncludesGels = false;
 
+  /// Distancia a la fuente principal (key light), en metros. Se usa para
+  /// proponer "acercá la fuente" cuando falta luz.
+  double keyLightDistanceM = 2.0;
+
   void setCamera(CameraSelection selection) {
     camera = selection;
     iso = selection.baseIso ?? 800;
@@ -97,6 +101,12 @@ class ShotState extends ChangeNotifier {
 
   void clearGels() {
     gels.clear();
+    notifyListeners();
+  }
+
+  void setKeyLightDistance(double metres) {
+    if (metres <= 0 || metres == keyLightDistanceM) return;
+    keyLightDistanceM = metres;
     notifyListeners();
   }
 
@@ -164,6 +174,7 @@ class ShotState extends ChangeNotifier {
     cameraFilters.clear();
     gels.clear();
     meterIncludesGels = false;
+    keyLightDistanceM = 2.0;
     notifyListeners();
   }
 }

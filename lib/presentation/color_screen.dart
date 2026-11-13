@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/catalogs/light_gels.dart';
 import '../domain/color/color_engine.dart';
 import '../domain/color/gel_advisor.dart';
+import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 
 /// Temperatura y gelatinas: cuánto corrimiento hace falta y con qué gel.
@@ -20,15 +21,41 @@ class _ColorScreenState extends State<ColorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final shift = ColorEngine.shiftTo(sourceKelvin: sourceK, targetKelvin: targetK);
-    final options = GelAdvisor.recommend(
-      sourceKelvin: sourceK,
-      targetKelvin: targetK,
-      limit: 3,
-    );
-    final best = options.isEmpty ? null : options.first;
-    final tintGel = _tintGel();
+    return ListenableBuilder(
+      listenable: ShotState.instance,
+      builder: (context, _) {
+        final shot = ShotState.instance;
+        final shift = ColorEngine.shiftTo(
+          sourceKelvin: sourceK,
+          targetKelvin: targetK,
+        );
+        // Los filtros de cámara (85, 80A, 81x) ya mueven el color de la imagen:
+        // la gelatina sólo cubre la diferencia.
+        final cameraMired = shot.cameraFilterMired;
+        final needed = shift.shiftMired - cameraMired;
 
+        final options = GelAdvisor.recommend(
+          sourceKelvin: sourceK,
+          targetKelvin: targetK,
+          limit: 3,
+          cameraMired: cameraMired,
+        );
+        final best = options.isEmpty ? null : options.first;
+        final tintGel = _tintGel();
+
+        return _body(shift, needed, cameraMired, options, best, tintGel);
+      },
+    );
+  }
+
+  Widget _body(
+    ColorShift shift,
+    double needed,
+    double cameraMired,
+    List<GelMatch> options,
+    GelMatch? best,
+    LightGel? tintGel,
+  ) {
     return Scaffold(
       backgroundColor: OnSetColors.background,
       appBar: AppBar(
@@ -50,7 +77,7 @@ class _ColorScreenState extends State<ColorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _resultCard(shift, best),
+            _resultCard(shift, needed, cameraMired, best),
             const SizedBox(height: 30),
             _sectionTitle('1. BALANCE DE TEMPERATURA'),
             _presetRow('FUENTE', [
@@ -89,8 +116,13 @@ class _ColorScreenState extends State<ColorScreen> {
     );
   }
 
-  Widget _resultCard(ColorShift shift, GelMatch? best) {
-    final mired = shift.shiftMired;
+  Widget _resultCard(
+    ColorShift shift,
+    double needed,
+    double cameraMired,
+    GelMatch? best,
+  ) {
+    final mired = needed;
     final color = mired.abs() < 3
         ? OnSetColors.ok
         : (mired > 0 ? OnSetColors.power : Colors.blueAccent);
@@ -104,7 +136,7 @@ class _ColorScreenState extends State<ColorScreen> {
       child: Column(
         children: [
           const Text(
-            'DESFASE TÉRMICO (MIREDS)',
+            'CORRIMIENTO A CORREGIR (MIREDS)',
             style: TextStyle(
               color: Colors.white54,
               fontSize: 10,
@@ -132,6 +164,13 @@ class _ColorScreenState extends State<ColorScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 11, color: Colors.white54),
           ),
+          const SizedBox(height: 6),
+          Text(
+            'fuente → cámara: ${shift.shiftMired.toStringAsFixed(0)} mireds'
+            '${cameraMired == 0 ? '' : ' · filtros de cámara: ${cameraMired > 0 ? '+' : ''}${cameraMired.toStringAsFixed(0)}'}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 9, color: Colors.white38),
+          ),
           const SizedBox(height: 18),
           Container(height: 1, color: Colors.white24),
           const SizedBox(height: 16),
@@ -158,6 +197,25 @@ class _ColorScreenState extends State<ColorScreen> {
               'pierde ${best.gel.stops.toStringAsFixed(2)} stops',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          ],
+          if (best == null || best.errorMired > 40) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: OnSetColors.surface,
+                border: Border.all(color: OnSetColors.brand.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                cameraMired.abs() >= 3
+                    ? 'Ninguna gelatina cubre este corrimiento: los filtros de cámara '
+                        'aportan ${cameraMired > 0 ? '+' : ''}${cameraMired.toStringAsFixed(0)} mireds. '
+                        'Revisá si ese filtro corresponde a la temperatura del objetivo.'
+                    : 'Ninguna gelatina cubre este corrimiento: revisá la temperatura del objetivo.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9, color: Colors.white54, height: 1.4),
+              ),
             ),
           ],
         ],

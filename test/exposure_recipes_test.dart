@@ -7,6 +7,7 @@ List<ExposureRecipe> suggest(
   double stops, {
   List<(String, double)> filters = const [],
   double aperture = 4,
+  double? lightDistance,
 }) =>
     ExposureRecipes.suggest(
       stops: stops,
@@ -16,6 +17,7 @@ List<ExposureRecipe> suggest(
       apertureScale: CineData.apertures,
       isoScale: CineData.isos,
       filters: filters,
+      lightDistanceM: lightDistance,
     );
 
 void main() {
@@ -85,6 +87,23 @@ void main() {
     expect(r.first.kind, RecipeKind.aperture);
     expect(r.first.value, closeTo(1.4, 0.01));
     expect(r.any((x) => x.kind == RecipeKind.shutter), isFalse);
+  });
+
+  test('con la distancia de la fuente, lo primero es acercarla', () {
+    final r = suggest(1, lightDistance: 2);
+    expect(r.first.kind, RecipeKind.moveLight);
+    expect(r.first.value, closeTo(1.414, 0.01));
+  });
+
+  test('si sobra luz, propone alejar la fuente', () {
+    final r = suggest(-1, lightDistance: 2);
+    expect(r.first.kind, RecipeKind.moveLight);
+    expect(r.first.value, closeTo(2.828, 0.01));
+  });
+
+  test('sin distancia de fuente no propone mover nada', () {
+    final r = suggest(1);
+    expect(r.any((x) => x.kind == RecipeKind.moveLight), isFalse);
   });
 
   test('seis pasos de más proponen el ND de seis pasos primero', () {

@@ -34,12 +34,31 @@ class GelAdvisor {
     List<LightGel> catalog = LightGels.all,
     Set<GelFamily>? families,
     int limit = 3,
+    double cameraMired = 0,
   }) {
     final shift = ColorEngine.shiftTo(
       sourceKelvin: sourceKelvin,
       targetKelvin: targetKelvin,
     ).shiftMired;
+    // Los filtros de cámara (85, 80A…) ya mueven el color de la imagen: la
+    // gelatina sólo tiene que cubrir la diferencia.
+    return recommendForMired(
+      shift - cameraMired,
+      sourceKelvin: sourceKelvin,
+      catalog: catalog,
+      families: families,
+      limit: limit,
+    );
+  }
 
+  /// Igual que [recommend], pero partiendo del corrimiento que hace falta.
+  static List<GelMatch> recommendForMired(
+    double shift, {
+    required double sourceKelvin,
+    List<LightGel> catalog = LightGels.all,
+    Set<GelFamily>? families,
+    int limit = 3,
+  }) {
     // Si la fuente ya está en el objetivo, no hace falta gel.
     if (shift.abs() < 3) return const [];
 
