@@ -12,7 +12,10 @@ enum PowerSource { tieIn, generator, battery }
 /// Los cálculos viven en `PowerEngine` y el catálogo de cables en
 /// `CableCatalog`; esta pantalla sólo los muestra.
 class ElectricityScreen extends StatefulWidget {
-  const ElectricityScreen({super.key});
+  /// Pestaña inicial: 0 = circuito, 1 = fases.
+  final int initialTab;
+
+  const ElectricityScreen({super.key, this.initialTab = 0});
 
   @override
   State<ElectricityScreen> createState() => _ElectricityScreenState();
@@ -46,10 +49,49 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
   double shootingHours = 12;
   bool isGasoline = true;
 
+  /// Corriente que el soporte aguanta por fase, según la pestaña CIRCUITO.
+  double? get _capacityPerPhase {
+    if (source == PowerSource.battery) return null;
+    if (source == PowerSource.generator) {
+      final gen = PowerEngine.generator(
+        nameplateKva: generatorKva,
+        altitudeM: altitudeM,
+        ambientC: ambientC,
+      );
+      return PowerEngine.generatorAmps(
+        kva: gen.usableKva,
+        voltage: voltage,
+        phases: phases,
+      );
+    }
+    return breakerAmps;
+  }
+
+  /// Texto que explica de dónde sale ese límite.
+  String get _sourceLabel {
+    switch (source) {
+      case PowerSource.battery:
+        return 'Batería ${batteryVoltage.toStringAsFixed(1)} V';
+      case PowerSource.generator:
+        final gen = PowerEngine.generator(
+          nameplateKva: generatorKva,
+          altitudeM: altitudeM,
+          ambientC: ambientC,
+        );
+        return 'Generador ${generatorKva.toStringAsFixed(0)} kVA → '
+            '${gen.usableKva.toStringAsFixed(1)} kVA reales · '
+            '${phases == Phases.three ? "trifásico" : "monofásico"}';
+      case PowerSource.tieIn:
+        return 'Red (tie-in) · breaker ${breakerAmps.toStringAsFixed(0)} A · '
+            '${phases == Phases.three ? "trifásico" : "monofásico"}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTab.clamp(0, 1),
       child: Scaffold(
         backgroundColor: OnSetColors.background,
         appBar: AppBar(
@@ -78,7 +120,11 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
         body: TabBarView(
           children: [
             _circuitTab(),
-            const DistroPanel(),
+            DistroPanel(
+              voltage: voltage,
+              limitAmps: _capacityPerPhase,
+              sourceLabel: _sourceLabel,
+            ),
           ],
         ),
       ),

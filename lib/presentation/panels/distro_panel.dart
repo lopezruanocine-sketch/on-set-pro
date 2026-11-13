@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/distro_presets.dart';
 import '../../domain/power/distro.dart';
 import '../../theme/app_theme.dart';
 
@@ -8,7 +9,21 @@ import '../../theme/app_theme.dart';
 /// Vive como pestaña dentro de Electricidad: es la misma pregunta
 /// (¿cuánta corriente tengo?) con varias cargas repartidas en fases.
 class DistroPanel extends StatefulWidget {
-  const DistroPanel({super.key});
+  /// Tensión entre fases del soporte elegido en la otra pestaña.
+  final double voltage;
+
+  /// Corriente que el soporte aguanta por fase. `null` = todavía no hay dato.
+  final double? limitAmps;
+
+  /// Texto que explica de dónde sale ese límite.
+  final String sourceLabel;
+
+  const DistroPanel({
+    super.key,
+    required this.voltage,
+    required this.limitAmps,
+    required this.sourceLabel,
+  });
 
   @override
   State<DistroPanel> createState() => _DistroPanelState();
@@ -19,14 +34,23 @@ class _DistroPanelState extends State<DistroPanel> {
   /// watts son el único dato que la app necesita. No hace falta un catálogo
   /// de luces: cambia todos los años y nunca está completo.
   final List<_DistroLoad> loads = [];
-  double voltage = 380;
-  double limitAmps = 32;
+  String? selectedPreset;
+
+  @override
+  void initState() {
+    super.initState();
+    DistroPresets.instance.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  double get limitAmps => widget.limitAmps ?? 0;
 
   @override
   Widget build(BuildContext context) {
     final plan = DistroEngine.distribute(
       loads: [for (final l in loads) Load(name: l.name, watts: l.watts)],
-      voltage: voltage,
+      voltage: widget.voltage,
       limitAmps: limitAmps,
     );
     final imbalance = DistroEngine.imbalancePercent(plan.phaseWatts);
@@ -36,6 +60,10 @@ class _DistroPanelState extends State<DistroPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _supportStrip(),
+            const SizedBox(height: 12),
+            _presetBar(),
+            const SizedBox(height: 14),
             _summary(plan, imbalance),
             const SizedBox(height: 18),
             _phases(plan),
@@ -79,8 +107,7 @@ class _DistroPanelState extends State<DistroPanel> {
                 ),
               ),
             const SizedBox(height: 22),
-            _settings(),
-            const SizedBox(height: 18),
+            const SizedBox(height: 8),
             Text(
               imbalance < 15
                   ? 'Desbalance ${imbalance.toStringAsFixed(0)} %: bien repartido.'
@@ -102,6 +129,172 @@ class _DistroPanelState extends State<DistroPanel> {
           ],
         ),
     );
+  }
+
+  /// Límite que viene del soporte elegido en CIRCUITO: una sola fuente de
+  /// verdad para el tablero, el generador o la batería.
+  Widget _supportStrip() {
+    final limit = widget.limitAmps;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(color: limit == null ? Colors.white12 : OnSetColors.power),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, size: 14, color: OnSetColors.power),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              limit == null
+                  ? 'Elegí el soporte en CIRCUITO para tener el límite por fase.'
+                  : '${widget.sourceLabel} · ${widget.voltage.toStringAsFixed(0)} V · '
+                      'límite ${limit.toStringAsFixed(1)} A',
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.3,
+                color: limit == null ? Colors.white38 : Colors.white70,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Repartos guardados: cargar uno, guardar el actual o borrar.
+  Widget _presetBar() {
+    final presets = DistroPresets.instance.presets;
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: OnSetColors.surface,
+              border: Border.all(color: Colors.white24),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: presets.any((p) => p.id == selectedPreset) ? selectedPreset : null,
+                hint: const Text(
+                  'CARGAR UN REPARTO',
+                  style: TextStyle(fontSize: 9, color: Colors.white38, letterSpacing: 1),
+                ),
+                isExpanded: true,
+                dropdownColor: OnSetColors.surfaceHigh,
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+                items: presets
+                    .map((p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(
+                            '${p.name}  ·  ${p.totalWatts.toStringAsFixed(0)} W',
+                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (id) {
+                  if (id == null) return;
+                  final preset = presets.firstWhere((p) => p.id == id);
+                  setState(() {
+                    selectedPreset = id;
+                    loads
+                      ..clear()
+                      ..addAll(preset.loads.map(
+                        (l) => _DistroLoad(name: l.name, watts: l.watts),
+                      ));
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: loads.isEmpty ? null : _savePreset,
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(color: loads.isEmpty ? Colors.white12 : OnSetColors.power),
+            ),
+            child: Text(
+              'GUARDAR',
+              style: TextStyle(
+                fontSize: 9,
+                letterSpacing: 1,
+                fontWeight: FontWeight.bold,
+                color: loads.isEmpty ? Colors.white24 : OnSetColors.power,
+              ),
+            ),
+          ),
+        ),
+        if (selectedPreset != null) ...[
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _deletePreset,
+            child: Container(
+              height: 40,
+              width: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(border: Border.all(color: Colors.white12)),
+              child: const Icon(Icons.delete_outline, size: 16, color: Colors.white38),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _savePreset() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: OnSetColors.surface,
+        title: const Text('Guardar reparto', style: TextStyle(fontSize: 15, color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: const InputDecoration(
+            hintText: 'Ej: entrevista 2 puntos',
+            hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCELAR', style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text(
+              'GUARDAR',
+              style: TextStyle(color: OnSetColors.power, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (name == null) return;
+    final preset = await DistroPresets.instance.save(
+      name: name,
+      loads: [for (final l in loads) PresetLoad(name: l.name, watts: l.watts)],
+    );
+    if (!mounted) return;
+    setState(() => selectedPreset = preset.id);
+  }
+
+  Future<void> _deletePreset() async {
+    final id = selectedPreset;
+    if (id == null) return;
+    await DistroPresets.instance.delete(id);
+    if (!mounted) return;
+    setState(() => selectedPreset = null);
   }
 
   Widget _summary(DistroPlan plan, double imbalance) {
@@ -300,20 +493,6 @@ class _DistroPanelState extends State<DistroPanel> {
         ],
       ),
     );
-  }
-
-  Widget _settings() {
-    return Row(
-      children: [
-        Expanded(child: _numField('TENSIÓN ENTRE FASES (V)', voltage, (v) => setState(() => voltage = v))),
-        const SizedBox(width: 12),
-        Expanded(child: _numField('LÍMITE POR FASE (A)', limitAmps, (v) => setState(() => limitAmps = v))),
-      ],
-    );
-  }
-
-  Widget _numField(String label, double value, Function(double) onChanged) {
-    return _DistroField(label: label, value: value, onChanged: onChanged);
   }
 
   Widget _section(String text) => Padding(
