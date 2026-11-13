@@ -258,3 +258,22 @@ Estas cinco herramientas estaban en el GDD v3.0 y nunca se construyeron. Todas v
 | Conversación con Gemini (58 pág.) | hasta nov 2026 | Desarrollo del código, pantalla por pantalla |
 | Este documento (v0) | 12 nov 2026 | Consolidación: qué existe hoy y qué falta |
 | Biblia v1 | 12 nov 2026 | Fase 0 cerrada: decisión de color, persistencia, limpieza técnica |
+
+---
+
+## Estado al cerrar el 12/11/2026
+
+**La app está publicada y andando:** https://lopezruanocine-sketch.github.io/on-set-pro/
+Repositorio: https://github.com/lopezruanocine-sketch/on-set-pro (público, con Pages desde la rama `gh-pages`).
+
+- 211 pruebas en verde, analizador limpio.
+- 11 herramientas en 5 departamentos.
+- Publicar una versión nueva: `flutter build web --release --base-href /on-set-pro/` y subir `build/web` a `gh-pages`.
+
+### Lo que falta, por orden de valor
+
+1. **Diseño**: logo, paleta por departamento, y las pantallas de formulario (hoy son desplegables). El menú y el visor son donde más se va a notar.
+2. **Sincronización entre dispositivos**: hoy cada teléfono/computadora guarda lo suyo.
+3. **Build nativa** (iOS/Android): falta CocoaPods y el SDK de Android en esta máquina. Ahí funcionan la linterna real y el flash.
+4. **Exportar desde el teléfono**: probar el menú de compartir en un dispositivo real.
+5. Pendientes chicos: editar dosis de ND por pasos, aviso de arranque de motores, audio en data, stock fílmico.
