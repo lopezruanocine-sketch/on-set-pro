@@ -2,8 +2,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../data/camera_devices.dart';
+import '../data/viewfinder_settings.dart';
 import '../domain/optics/viewfinder_math.dart';
-import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
 
 /// Visor de dirección: muestra la vista de la cámara del dispositivo con el
@@ -30,35 +30,78 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   double focal = 25;
   double phoneFov = 70;
   bool squeeze2x = false;
+  ViewfinderSettings settings = ViewfinderSettings.defaults;
 
   @override
   void initState() {
     super.initState();
-    _loadDevices();
-    _fromShot();
+    _boot();
   }
 
-  void _fromShot() {
-    final sensor = ShotState.instance.camera?.sensor;
-    if (sensor != null) {
-      sensorWidth = sensor.widthMm;
-      sensorHeight = sensor.heightMm;
-    }
+  /// Recupera la memoria del visor y después busca las cámaras.
+  Future<void> _boot() async {
+    final saved = await ViewfinderSettings.load();
+    if (!mounted) return;
+    setState(() {
+      settings = saved;
+      sensorWidth = saved.sensorWidthMm;
+      sensorHeight = saved.sensorHeightMm;
+      focal = saved.focalMm;
+      phoneFov = saved.phoneFov;
+      squeeze2x = saved.squeeze;
+    });
+    await _loadDevices(preferredId: saved.cameraId);
   }
 
-  Future<void> _loadDevices() async {
-    final found = await CameraDevices.list();
+
+  /// Guarda el encuadre cada vez que cambia algo.
+  Future<void> _persist() async {
+    settings = settings.copyWith(
+      cameraId: current?.id,
+      sensorWidthMm: sensorWidth,
+      sensorHeightMm: sensorHeight,
+      focalMm: focal,
+      phoneFov: phoneFov,
+      squeeze: squeeze2x,
+    );
+    await settings.save();
+  }
+
+  Future<void> _loadDevices({String? preferredId}) async {
+    // Si el sistema no responde (sin permiso o sin cámara), no dejamos la
+    // pantalla girando para siempre.
+    final found = await CameraDevices.list().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => const [],
+    );
     if (!mounted) return;
     setState(() {
       devices = found;
       loading = false;
-      if (found.isEmpty) error = 'No hay cámaras disponibles o falta el permiso.';
+      if (found.isEmpty) {
+        error = 'No hay cámaras disponibles. Aceptá el permiso de cámara '
+            'y recargá la pantalla.';
+      }
     });
-    final pick = CameraDevices.pick(found);
-    if (pick != null) await _start(pick);
+
+    // La cámara guardada manda; si ya no está, se cae a la de siempre.
+    CaptureCamera? pick;
+    if (preferredId != null) {
+      for (final d in found) {
+        if (d.id == preferredId) {
+          pick = d;
+          break;
+        }
+      }
+      if (pick == null && found.isNotEmpty) {
+        error = 'La cámara guardada ya no está disponible: uso otra.';
+      }
+    }
+    pick ??= CameraDevices.pick(found);
+    if (pick != null) await _start(pick, remember: true);
   }
 
-  Future<void> _start(CaptureCamera device) async {
+  Future<void> _start(CaptureCamera device, {bool remember = true}) async {
     await controller?.dispose();
     try {
       final next = CameraController(
@@ -78,8 +121,8 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
       setState(() {
         controller = next;
         current = device;
-        error = null;
       });
+      if (remember) await _persist();
     } catch (e) {
       if (!mounted) return;
       setState(() => error = 'No se pudo abrir la cámara: $e');
@@ -122,7 +165,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => _cycleCamera(),
+              onTap: _chooseCamera,
               child: Container(
                 color: Colors.black,
                 child: _preview(frame),
@@ -193,6 +236,8 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          _cameraRow(),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(child: _sensorPicker()),
@@ -205,7 +250,12 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
             children: [
               Expanded(child: _numberField('FOV TELÉFONO (°)', phoneFov, (v) => setState(() => phoneFov = v))),
               const SizedBox(width: 10),
-              Expanded(child: _chip('ANAMÓRFICO 2×', squeeze2x, () => setState(() => squeeze2x = !squeeze2x))),
+              Expanded(
+                child: _chip('ANAMÓRFICO 2×', squeeze2x, () {
+                  setState(() => squeeze2x = !squeeze2x);
+                  _persist();
+                }),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -226,11 +276,110 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
     );
   }
 
-  Future<void> _cycleCamera() async {
-    if (devices.length < 2) return;
-    final index = devices.indexOf(current ?? devices.first);
-    final next = devices[(index + 1) % devices.length];
-    await _start(next);
+  /// Selector visible: lista todas las cámaras y la elegida queda guardada.
+  Future<void> _chooseCamera() async {
+    if (devices.isEmpty) return;
+    final chosen = await showModalBottomSheet<CaptureCamera>(
+      context: context,
+      backgroundColor: OnSetColors.surface,
+      shape: const RoundedRectangleBorder(),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'CÁMARA DE CAPTURA',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final device in devices)
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  device.isFront ? Icons.camera_front : Icons.camera_rear,
+                  color: device.id == current?.id ? OnSetColors.brand : Colors.white38,
+                  size: 20,
+                ),
+                title: Text(
+                  device.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: device.id == current?.id ? OnSetColors.brand : Colors.white,
+                  ),
+                ),
+                trailing: device.id == current?.id
+                    ? const Icon(Icons.check, color: OnSetColors.brand, size: 16)
+                    : null,
+                onTap: () => Navigator.pop(context, device),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen != null) await _start(chosen);
+  }
+
+  /// Muestra la cámara en uso y deja cambiarla.
+  Widget _cameraRow() {
+    final label = current?.label ?? (devices.isEmpty ? 'SIN CÁMARA' : 'ELEGÍ UNA CÁMARA');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            current?.isFront == true ? Icons.camera_front : Icons.camera_rear,
+            color: OnSetColors.brand,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: devices.isEmpty ? null : _chooseCamera,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: devices.isEmpty ? Colors.white12 : OnSetColors.brand,
+                ),
+              ),
+              child: Text(
+                'CAMBIAR',
+                style: TextStyle(
+                  fontSize: 9,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.bold,
+                  color: devices.isEmpty ? Colors.white24 : OnSetColors.brand,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _sensorPicker() {
@@ -255,6 +404,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
           sensorWidth = size.$1;
           sensorHeight = size.$2;
         });
+        _persist();
       },
     );
   }
@@ -265,7 +415,10 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
       'FOCAL (mm)',
       focal.toStringAsFixed(0),
       focales.map((f) => f.toStringAsFixed(0)).toList(),
-      (v) => setState(() => focal = double.parse(v)),
+      (v) {
+        setState(() => focal = double.parse(v));
+        _persist();
+      },
     );
   }
 
