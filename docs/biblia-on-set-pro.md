@@ -277,3 +277,28 @@ Repositorio: https://github.com/lopezruanocine-sketch/on-set-pro (público, con 
 3. **Build nativa** (iOS/Android): falta CocoaPods y el SDK de Android en esta máquina. Ahí funcionan la linterna real y el flash.
 4. **Exportar desde el teléfono**: probar el menú de compartir en un dispositivo real.
 5. Pendientes chicos: editar dosis de ND por pasos, aviso de arranque de motores, audio en data, stock fílmico.
+
+---
+
+## Convenio de signos (decidido el 13/11/2026)
+
+**El número es la acción, nunca el diagnóstico.**
+
+- `+` = sumar luz, siempre. En rojo: es el caso caro (más unidades, más potencia).
+- `−` = quitar luz, siempre. En ámbar: se resuelve cerrando o con ND.
+- La tarjeta repite la acción en palabras (`SUMÁ 4,0 PASOS`) para que el signo y
+  la frase no puedan contradecirse.
+
+Se probó el convenio inverso (número = cuánto está desviada la imagen) y se
+descartó: el ojo lee el signo y el color antes que la frase, y un `−3,0` en rojo
+con "sumá 3" abajo se lee como "restá".
+
+## Estado al cerrar el 13/11/2026
+
+- 243 pruebas en verde. Versión publicada: 1.2.1.
+- Visor funcionando: zoom por CSS sobre el video (lo único que escala una vista
+  de plataforma en web), focal libre, foto con el encuadre y franja de datos.
+- Compensar rediseñado: resultado después de los controles, recetario plegado
+  como "opciones", gelatinas de todas las familias (no sólo color).
+- Obturador con ángulo y velocidad a la vez.
+- Falta revisar: Color y geles, Flicker, y el repaso de Producción.
