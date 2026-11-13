@@ -6,6 +6,7 @@ import '../core/cine_data.dart';
 import '../core/localization.dart';
 import '../core/pro_input.dart';
 import '../data/catalogs/camera_filters.dart';
+import '../data/catalogs/light_gels.dart';
 import '../data/shots_repository.dart';
 import '../domain/exposure/exposure_engine.dart';
 import '../domain/exposure/exposure_recipes.dart';
@@ -46,10 +47,10 @@ class ExpoFotoTabs extends StatelessWidget {
             labelColor: OnSetColors.brand,
             unselectedLabelColor: Colors.white38,
             tabs: [
-              Tab(text: "MAPA DE ZONAS"),
+              Tab(text: "ZONAS"),
               Tab(text: "FALL-OFF"),
               Tab(text: "COMPENSAR"),
-              Tab(text: "FOTOMETRÍA (LUX/F)"),
+              Tab(text: "LUX / f"),
             ],
           ),
         ),
@@ -481,7 +482,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
                 ],
               ),
               const SizedBox(height: 25),
-              _sectionLabel('AJUSTES DEL PLANO'),
+              _sectionLabel('TU CÁMARA'),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -507,7 +508,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               const SizedBox(height: 15),
               _shutterControl(shot),
               const SizedBox(height: 25),
-              _sectionLabel('FILTROS DE CÁMARA (DELANTE DEL SENSOR)'),
+              _sectionLabel('LO QUE YA ESTÁ PUESTO'),
               const SizedBox(height: 8),
               _lossList(
                 items: [
@@ -517,15 +518,14 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
                     .where((f) => f.stops > 0)
                     .map((f) => f.name)
                     .toList(),
-                emptyText: 'Sin filtros: la lente está limpia.',
+                emptyText: 'Sin filtros delante del sensor.',
+                label: 'DELANTE DEL SENSOR',
                 onAdd: (name) => shot.addFilter(CameraFilters.byName(name)),
                 onRemove: (i) => shot.removeFilter(shot.cameraFilters[i]),
               ),
-              const SizedBox(height: 20),
-              _sectionLabel('GELATINAS EN LA LUZ (DELANTE DE LA FUENTE)'),
-              const SizedBox(height: 8),
-              _gelSummary(context, shot),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
+              _gelPicker(context, shot),
+              const SizedBox(height: 14),
               _manualInput(
                 'FUENTE PRINCIPAL A (m)',
                 shot.keyLightDistanceM,
@@ -534,21 +534,16 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               ),
               const SizedBox(height: 10),
               _meterGelToggle(shot),
-              const SizedBox(height: 12),
-              _lossTotal(shot),
               const SizedBox(height: 30),
               _resultCard(
                 stops: result.stops,
-                title: 'CORRECCIÓN NECESARIA',
+                title: 'DESBALANCE',
                 subtitle: _compensationSubtitle(result),
-                ndHint: result.stops < -0.2
-                    ? CameraFilters.closestNd(result.stops)?.name.split(' — ').first
-                    : null,
               ),
               const SizedBox(height: 16),
               _breakdown(result, shot),
               const SizedBox(height: 16),
-              _recipes(result, shot),
+              _compensationOptions(result, shot),
               const SizedBox(height: 20),
               _savePlanButton(),
             ],
@@ -634,12 +629,14 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
     );
   }
 
+  /// Sólo dice cuánto falta o sobra. Cómo compensarlo lo decide quien rueda:
+  /// puede ser el diafragma, un filtro o mover la luz.
   String _compensationSubtitle(CompensationResult result) {
-    if (result.isBalanced) return 'La exposición coincide con la lectura.';
-    if (result.stops > 0) {
-      return 'Falta luz: abrí diafragma, subí ISO, alargá el obturador o sumá luz.';
-    }
-    return 'Sobra luz: cerrá diafragma, bajá ISO, acortá el obturador o poné ND.';
+    final amount = result.stops.abs().toStringAsFixed(1).replaceAll('.', ',');
+    final pasos = result.stops.abs() < 1.05 ? 'paso' : 'pasos';
+    if (result.isBalanced) return 'La imagen está en su punto.';
+    if (result.stops > 0) return 'Falta luz: $amount $pasos.';
+    return 'Sobra luz: $amount $pasos.';
   }
 
   Widget _shutterControl(ShotState shot) {
@@ -687,6 +684,13 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
             (v) => shot.setShutterDenominator(v),
             prefix: '1/',
           ),
+        const SizedBox(height: 6),
+        Text(
+          '${shot.shutterAngle.toStringAsFixed(1)}° · '
+          '1/${shot.shutterDenominator.toStringAsFixed(0)} s a '
+          '${shot.fps.toStringAsFixed(0)} fps',
+          style: const TextStyle(fontSize: 9, color: Colors.white30),
+        ),
       ],
     );
   }
@@ -706,6 +710,156 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
       }
     }
     return best;
+  }
+
+  /// Gelatinas y difusiones puestas en la luz.
+  ///
+  /// Acá entran todas: color, difusión y verde/magenta. El color se decide en
+  /// su pantalla, pero un difusor no cambia color: sólo quita luz.
+  Widget _gelPicker(BuildContext context, ShotState shot) {
+    final gels = shot.gels;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _sectionLabel('EN LA LUZ'),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ColorScreen()),
+              ),
+              child: const Text(
+                'DECIDIR COLOR',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: OnSetColors.power,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (gels.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Sin gelatinas ni difusión: la fuente va limpia.',
+              style: TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final g in gels)
+                GestureDetector(
+                  onTap: () => shot.removeGel(g),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: OnSetColors.surface,
+                      border: Border.all(color: OnSetColors.power.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${g.brand} ${g.code}',
+                          style: const TextStyle(fontSize: 10, color: Colors.white),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '−${g.stops.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: OnSetColors.danger,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.close, size: 11, color: Colors.white38),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(height: 8),
+        _GelAdder(onAdd: (gel) => shot.addGel(gel)),
+      ],
+    );
+  }
+
+  /// Opciones para compensar: se muestran como posibilidades, no como órdenes.
+  Widget _compensationOptions(CompensationResult result, ShotState shot) {
+    if (result.isBalanced) return const SizedBox.shrink();
+
+    final recipes = ExposureRecipes.suggest(
+      stops: result.stops,
+      aperture: desiredF,
+      iso: shot.iso,
+      shutterAngle: shot.shutterAngle,
+      apertureScale: CineData.apertures,
+      isoScale: CineData.isos,
+      filters: [
+        for (final f in shot.cameraFilters) (f.name, f.stops),
+      ],
+      lightDistanceM: shot.keyLightDistanceM,
+    );
+
+    return _Collapsible(
+      title: 'OPCIONES PARA COMPENSAR',
+      subtitle: result.stops > 0
+          ? 'Falta luz. Hay varias maneras de sumarla.'
+          : 'Sobra luz. Hay varias maneras de quitarla.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (recipes.isEmpty)
+            _hint(
+              result.stops > 0
+                  ? 'Ninguna variable sola alcanza: hace falta sumar luz en la escena.'
+                  : 'Ninguna variable sola alcanza: hace falta quitar luz en la escena.',
+            )
+          else
+            ...recipes.map(
+              (r) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: OnSetColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _recipeKindLabel(r.kind),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: Colors.white38,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _recipeValueLabel(r, result.stops),
+                        style: const TextStyle(fontSize: 13, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _breakdown(CompensationResult result, ShotState shot) {
@@ -781,76 +935,6 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _recipes(CompensationResult result, ShotState shot) {
-    if (result.isBalanced) return const SizedBox.shrink();
-
-    final recipes = ExposureRecipes.suggest(
-      stops: result.stops,
-      aperture: desiredF,
-      iso: shot.iso,
-      shutterAngle: shot.shutterAngle,
-      apertureScale: CineData.apertures,
-      isoScale: CineData.isos,
-      filters: [
-        for (final f in shot.cameraFilters) (f.name, f.stops),
-      ],
-      lightDistanceM: shot.keyLightDistanceM,
-    );
-
-    if (recipes.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionLabel('RECETARIO'),
-          const SizedBox(height: 8),
-          _hint(
-            result.stops > 0
-                ? 'No alcanza con una sola variable: hace falta sumar luz en la escena.'
-                : 'No alcanza con una sola variable: hace falta quitar luz en la escena o duplicar el filtro.',
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionLabel('RECETARIO'),
-        const SizedBox(height: 10),
-        ...recipes.map(
-          (r) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: OnSetColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    _recipeKindLabel(r.kind),
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: Colors.white38,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _recipeValueLabel(r, result.stops),
-                    style: const TextStyle(fontSize: 13, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1142,7 +1226,7 @@ Widget _resultCard({
         ),
         const SizedBox(height: 12),
         Text(
-          balanced ? 'OK' : '${stops > 0 ? '+' : ''}${stops.toStringAsFixed(1)} STOPS',
+          balanced ? 'OK' : '${stops > 0 ? '+' : ''}${stops.toStringAsFixed(1)} PASOS',
           style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, color: accent),
         ),
         if (subtitle != null) ...[
@@ -1310,82 +1394,8 @@ class _ManualFieldState extends State<_ManualField> {
 /// delante de la fuente. Cada uno aporta sus pasos y el total se muestra aparte.
 /// Las gelatinas se eligen en Color (donde se decide por temperatura) y acá
 /// sólo se muestran: así no hay dos lugares donde elegir lo mismo.
-Widget _gelSummary(BuildContext context, ShotState shot) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (shot.gels.isEmpty)
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Sin gelatinas: la fuente va limpia.',
-                style: TextStyle(fontSize: 10, color: Colors.white38),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ColorScreen()),
-              ),
-              child: const Text(
-                'ELEGIR EN COLOR',
-                style: TextStyle(fontSize: 9, color: OnSetColors.power, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        )
-      else ...[
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final g in shot.gels)
-              GestureDetector(
-                onTap: () => shot.removeGel(g),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: OnSetColors.surface,
-                    border: Border.all(color: OnSetColors.power.withValues(alpha: 0.5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(g.label, style: const TextStyle(fontSize: 11, color: Colors.white)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '−${g.stops.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 11, color: OnSetColors.danger, fontFamily: 'monospace'),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.close, size: 12, color: Colors.white38),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ColorScreen()),
-            ),
-            child: const Text(
-              'CAMBIAR EN COLOR',
-              style: TextStyle(fontSize: 9, color: OnSetColors.power, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      ],
-    ],
-  );
-}
-
 Widget _lossList({
+  String? label,
   required List<(String, double)> items,
   required List<String> options,
   required String emptyText,
@@ -1398,6 +1408,18 @@ Widget _lossList({
   return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      if (label != null) ...[
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 8,
+            color: Colors.white24,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 5),
+      ],
       if (items.isEmpty)
         Text(
           emptyText,
@@ -1522,35 +1544,171 @@ Widget _meterGelToggle(ShotState shot) {
 }
 
 /// Pérdida total del plano, separada por familia.
-Widget _lossTotal(ShotState shot) {
-  final total = shot.lossStops;
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: Colors.black,
-      border: Border.all(color: total > 0 ? OnSetColors.danger : Colors.white12),
-    ),
-    child: Row(
+/// Selector de gelatinas y difusiones agrupado por familia.
+class _GelAdder extends StatefulWidget {
+  final void Function(LightGel gel) onAdd;
+
+  const _GelAdder({required this.onAdd});
+
+  @override
+  State<_GelAdder> createState() => _GelAdderState();
+}
+
+class _GelAdderState extends State<_GelAdder> {
+  LightGel? _picked;
+
+  static String _familyLabel(GelFamily f) => switch (f) {
+        GelFamily.cto => 'CÁLIDAS',
+        GelFamily.ctb => 'FRÍAS',
+        GelFamily.green => 'VERDE',
+        GelFamily.magenta => 'MAGENTA',
+        GelFamily.diffusion => 'DIFUSIÓN',
+        GelFamily.color => 'COLOR',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final gels = LightGels.all;
+    return Row(
       children: [
-        const Text(
-          'PÉRDIDA DE LUZ DEL PLANO',
-          style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        Expanded(
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: OnSetColors.surface,
+              border: Border.all(color: Colors.white24),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<LightGel>(
+                value: _picked,
+                hint: const Text(
+                  'AGREGAR GELATINA O DIFUSIÓN',
+                  style: TextStyle(fontSize: 9, color: Colors.white38, letterSpacing: 1),
+                ),
+                isExpanded: true,
+                dropdownColor: OnSetColors.surfaceHigh,
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+                items: [
+                  for (final gel in gels)
+                    DropdownMenuItem(
+                      value: gel,
+                      child: Text(
+                        '${_familyLabel(gel.family)} · ${gel.brand} ${gel.code} ${gel.name}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _picked = v),
+              ),
+            ),
+          ),
         ),
-        const Spacer(),
-        Text(
-          'cámara −${shot.filterStops.toStringAsFixed(1)} · luz −${shot.gelStops.toStringAsFixed(1)}',
-          style: const TextStyle(fontSize: 9, color: Colors.white38),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          total == 0 ? '0' : '−${total.toStringAsFixed(1)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontFamily: 'monospace',
-            color: total > 0 ? OnSetColors.danger : Colors.white38,
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _picked == null
+              ? null
+              : () {
+                  widget.onAdd(_picked!);
+                  setState(() => _picked = null);
+                },
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _picked == null ? Colors.white12 : OnSetColors.power,
+              ),
+            ),
+            child: Text(
+              'SUMAR',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                color: _picked == null ? Colors.white24 : OnSetColors.power,
+              ),
+            ),
           ),
         ),
       ],
-    ),
-  );
+    );
+  }
+}
+
+/// Sección que se abre y se cierra: el contenido secundario arranca cerrado.
+class _Collapsible extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _Collapsible({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  State<_Collapsible> createState() => _CollapsibleState();
+}
+
+class _CollapsibleState extends State<_Collapsible> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _open = !_open),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: OnSetColors.surface,
+              border: Border.all(color: Colors.white10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle,
+                        style: const TextStyle(fontSize: 9, color: Colors.white30),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: Colors.white38,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_open) ...[
+          const SizedBox(height: 10),
+          widget.child,
+        ],
+      ],
+    );
+  }
 }
