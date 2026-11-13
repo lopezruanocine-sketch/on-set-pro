@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/catalogs/cables.dart';
+import '../data/electricity_settings.dart';
 import '../domain/power/power_engine.dart';
 import '../theme/app_theme.dart';
 import 'panels/distro_panel.dart';
@@ -49,6 +50,91 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
   double shootingHours = 12;
   bool isGasoline = true;
 
+  /// Tensión de red: lo primero que se elige, porque de eso dependen todos
+  /// los amperajes de la app.
+  Widget _voltageHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      color: OnSetColors.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TENSIÓN DE RED',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.white38,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              for (final v in [110.0, 220.0, 240.0])
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => voltage = v);
+                      _persistSettings();
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: voltage == v ? OnSetColors.power : Colors.transparent,
+                        border: Border.all(
+                          color: voltage == v ? OnSetColors.power : Colors.white24,
+                        ),
+                      ),
+                      child: Text(
+                        '${v.toStringAsFixed(0)} V',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: voltage == v ? Colors.black : Colors.white54,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                flex: 2,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => phases = phases == Phases.three
+                        ? Phases.single
+                        : Phases.three);
+                    _persistSettings();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: phases == Phases.three ? OnSetColors.power : Colors.white24,
+                      ),
+                    ),
+                    child: Text(
+                      phases == Phases.three ? 'TRIFÁSICO' : 'MONOFÁSICO',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: phases == Phases.three ? OnSetColors.power : Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Corriente que el soporte aguanta por fase, según la pestaña CIRCUITO.
   double? get _capacityPerPhase {
     if (source == PowerSource.battery) return null;
@@ -88,6 +174,22 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    ElectricitySettings.load().then((saved) {
+      if (!mounted) return;
+      setState(() {
+        voltage = saved.voltage;
+        phases = saved.phases;
+      });
+    });
+  }
+
+  Future<void> _persistSettings() async {
+    await ElectricitySettings(voltage: voltage, phases: phases).save();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
@@ -117,13 +219,21 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            _circuitTab(),
-            DistroPanel(
-              voltage: voltage,
-              limitAmps: _capacityPerPhase,
-              sourceLabel: _sourceLabel,
+            _voltageHeader(),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _circuitTab(),
+                  DistroPanel(
+                    voltage: voltage,
+                    phases: phases,
+                    limitAmps: _capacityPerPhase,
+                    sourceLabel: _sourceLabel,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -309,20 +419,6 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
 
   List<Widget> _mainsCapacity() {
     return [
-      const Text('VOLTAJE REGIONAL', style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      _toggleRow([
-        ('110 V', voltage == 110, () => setState(() => voltage = 110)),
-        ('220 V', voltage == 220, () => setState(() => voltage = 220)),
-        ('240 V', voltage == 240, () => setState(() => voltage = 240)),
-      ]),
-      const SizedBox(height: 12),
-      const Text('FASES', style: TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      _toggleRow([
-        ('MONOFÁSICO', phases == Phases.single, () => setState(() => phases = Phases.single)),
-        ('TRIFÁSICO', phases == Phases.three, () => setState(() => phases = Phases.three)),
-      ]),
       const SizedBox(height: 15),
       Row(
         children: [

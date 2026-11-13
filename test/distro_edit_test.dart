@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:on_set_pro/data/camera_selection.dart';
 import 'package:on_set_pro/presentation/electricity_screen.dart';
 import 'package:on_set_pro/presentation/panels/distro_panel.dart';
+import 'package:on_set_pro/domain/power/power_engine.dart';
 import 'package:on_set_pro/state/shot_state.dart';
 
 void main() {
@@ -15,6 +16,7 @@ void main() {
       home: Scaffold(
         body: DistroPanel(
           voltage: 380,
+          phases: Phases.three,
           limitAmps: limit,
           sourceLabel: 'Generador 20 kVA',
         ),

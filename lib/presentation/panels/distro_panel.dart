@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/distro_presets.dart';
 import '../../domain/power/distro.dart';
+import '../../domain/power/power_engine.dart';
 import '../../theme/app_theme.dart';
 
 /// Reparto de cargas en una distro trifásica.
@@ -14,6 +15,9 @@ class DistroPanel extends StatefulWidget {
   /// Tensión entre fases del soporte elegido en la otra pestaña.
   final double voltage;
 
+  /// Monofásico o trifásico: define la tensión con la que se calcula cada fase.
+  final Phases phases;
+
   /// Corriente que el soporte aguanta por fase. `null` = todavía no hay dato.
   final double? limitAmps;
 
@@ -23,6 +27,7 @@ class DistroPanel extends StatefulWidget {
   const DistroPanel({
     super.key,
     required this.voltage,
+    required this.phases,
     required this.limitAmps,
     required this.sourceLabel,
   });
@@ -47,6 +52,12 @@ class _DistroPanelState extends State<DistroPanel> {
   }
 
   double get limitAmps => widget.limitAmps ?? 0;
+
+  /// Tensión a la que trabaja cada carga: en trifásico es la de fase,
+  /// en monofásico es la de red.
+  double get phaseVoltage => widget.phases == Phases.three
+      ? widget.voltage / math.sqrt(3)
+      : widget.voltage;
 
   @override
   Widget build(BuildContext context) {
@@ -405,12 +416,12 @@ class _DistroPanelState extends State<DistroPanel> {
       if (p != null) assignedPhase[i] = p;
     }
 
-    final phaseVoltage = widget.voltage / math.sqrt(3);
+    final perVoltage = phaseVoltage;
     final perPhaseLimit = limitAmps;
 
     return [
       for (var i = 0; i < loads.length; i++)
-        _loadRow(i, assignedPhase[i], phaseVoltage, perPhaseLimit),
+        _loadRow(i, assignedPhase[i], perVoltage, perPhaseLimit),
     ];
   }
 
@@ -497,7 +508,12 @@ class _DistroPanelState extends State<DistroPanel> {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _duplicateLoad(index),
+              child: const Icon(Icons.copy, size: 13, color: Colors.white24),
+            ),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: () => setState(() => loads.removeAt(index)),
               child: const Icon(Icons.close, size: 14, color: Colors.white24),
@@ -506,6 +522,17 @@ class _DistroPanelState extends State<DistroPanel> {
         ),
       ),
     );
+  }
+
+  /// Copia una carga: lo habitual es tener dos luminarias iguales.
+  void _duplicateLoad(int index) {
+    final original = loads[index];
+    setState(() {
+      loads.insert(
+        index + 1,
+        _DistroLoad(name: original.name, watts: original.watts),
+      );
+    });
   }
 
   /// AUTO → F1 → F2 → F3 → AUTO: mover una carga de fase con un toque.

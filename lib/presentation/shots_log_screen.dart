@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../data/catalogs/camera_filters.dart';
 import '../data/catalogs/light_gels.dart';
+import '../data/shot_export.dart';
 import '../data/shots_repository.dart';
 import '../state/shot_state.dart';
 import '../theme/app_theme.dart';
@@ -18,6 +24,7 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 2, vsync: this);
   final TextEditingController _noteController = TextEditingController();
+  final GlobalKey _plansKey = GlobalKey();
   String department = 'CÁMARA';
 
   @override
@@ -53,6 +60,13 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
             fontSize: 14,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'EXPORTAR PLANOS',
+            icon: const Icon(Icons.ios_share, color: Colors.white70),
+            onPressed: repo.plans.isEmpty ? null : _exportSheet,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           indicatorColor: OnSetColors.tools,
@@ -74,6 +88,100 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
     );
   }
 
+  /// Exporta los planos: texto para pegar, PDF para imprimir o imagen.
+  Future<void> _exportSheet() async {
+    final plans = ShotsRepository.instance.plans;
+    if (plans.isEmpty) return;
+    final camera = ShotState.instance.camera?.label;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: OnSetColors.surface,
+      shape: const RoundedRectangleBorder(),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'EXPORTAR PLANOS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final option in const [
+              ('TEXTO (.txt)', 'para pegar en un mail o una planilla', 'txt'),
+              ('PDF', 'para imprimir o archivar', 'pdf'),
+              ('IMAGEN (PNG)', 'captura de la lista como la ves', 'png'),
+            ])
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.description_outlined, color: OnSetColors.tools, size: 20),
+                title: Text(option.$1, style: const TextStyle(fontSize: 12, color: Colors.white)),
+                subtitle: Text(option.$2, style: const TextStyle(fontSize: 9, color: Colors.white38)),
+                onTap: () => Navigator.pop(context, option.$3),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    try {
+      if (choice == 'txt') {
+        await SharePlus.instance.share(
+          ShareParams(
+            text: ShotExport.toText(plans, cameraLabel: camera),
+            subject: 'On Set Pro · planos',
+          ),
+        );
+      } else if (choice == 'pdf') {
+        final bytes = await ShotExport.toPdf(plans, cameraLabel: camera);
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+            fileNameOverrides: ['on_set_planos.pdf'],
+            subject: 'On Set Pro · planos',
+          ),
+        );
+      } else {
+        await _exportImage();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo exportar: $e')),
+      );
+    }
+  }
+
+  /// Captura la lista tal como se ve.
+  Future<void> _exportImage() async {
+    final box = _plansKey.currentContext;
+    if (box == null) return;
+    final boundary = box.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 2);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (data == null) return;
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(data.buffer.asUint8List(), mimeType: 'image/png')],
+        fileNameOverrides: ['on_set_planos.png'],
+        text: 'On Set Pro · planos',
+      ),
+    );
+  }
+
   Widget _plansTab(ShotsRepository repo) {
     if (repo.plans.isEmpty) {
       return const Center(
@@ -87,7 +195,11 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
         ),
       );
     }
-    return ListView.builder(
+    return RepaintBoundary(
+      key: _plansKey,
+      child: ColoredBox(
+        color: OnSetColors.background,
+        child: ListView.builder(
       padding: const EdgeInsets.all(18),
       itemCount: repo.plans.length,
       itemBuilder: (context, i) {
@@ -185,6 +297,8 @@ class _ShotsLogScreenState extends State<ShotsLogScreen>
           ),
         );
       },
+        ),
+      ),
     );
   }
 
