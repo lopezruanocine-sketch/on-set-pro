@@ -538,7 +538,6 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               _resultCard(
                 stops: result.stops,
                 title: 'DESBALANCE',
-                subtitle: _compensationSubtitle(result),
               ),
               const SizedBox(height: 16),
               _breakdown(result, shot),
@@ -627,16 +626,6 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Plano guardado en PLANOS Y NOTAS.')),
     );
-  }
-
-  /// Sólo dice cuánto falta o sobra. Cómo compensarlo lo decide quien rueda:
-  /// puede ser el diafragma, un filtro o mover la luz.
-  String _compensationSubtitle(CompensationResult result) {
-    final amount = result.stops.abs().toStringAsFixed(1).replaceAll('.', ',');
-    final pasos = result.stops.abs() < 1.05 ? 'paso' : 'pasos';
-    if (result.isBalanced) return 'La imagen está en su punto.';
-    if (result.stops > 0) return 'Falta luz: $amount $pasos.';
-    return 'Sobra luz: $amount $pasos.';
   }
 
   Widget _shutterControl(ShotState shot) {
@@ -1206,9 +1195,11 @@ Widget _resultCard({
   String? ndHint,
 }) {
   final balanced = stops.abs() < 0.05;
+  // Rojo cuando falta luz: es el caso que obliga a sumar unidades o potencia.
+  // Ámbar cuando sobra: se resuelve cerrando o con un filtro.
   final accent = balanced
       ? OnSetColors.ok
-      : (stops > 0 ? OnSetColors.brand : OnSetColors.danger);
+      : (stops > 0 ? OnSetColors.danger : OnSetColors.brand);
 
   return Container(
     width: double.infinity,
@@ -1229,6 +1220,26 @@ Widget _resultCard({
           balanced ? 'OK' : '${stops > 0 ? '+' : ''}${stops.toStringAsFixed(1)} PASOS',
           style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, color: accent),
         ),
+        if (!balanced) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Text(
+              stops > 0
+                  ? 'SUMÁ ${stops.abs().toStringAsFixed(1).replaceAll('.', ',')} PASOS'
+                  : 'QUITÁ ${stops.abs().toStringAsFixed(1).replaceAll('.', ',')} PASOS',
+              style: const TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
         if (subtitle != null) ...[
           const SizedBox(height: 10),
           Text(
