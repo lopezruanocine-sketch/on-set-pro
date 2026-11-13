@@ -13,6 +13,7 @@ import 'light_screen.dart';
 import 'nd_quick_screen.dart';
 import 'shots_log_screen.dart';
 import 'solar_screen.dart';
+import 'viewfinder_screen.dart';
 import '../data/camera_selection.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -206,6 +207,17 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ColorScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'VISOR DE CÁMARA',
+              icon: Icons.camera_alt_outlined,
+              accent: OnSetColors.camera,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ViewfinderScreen()),
                 );
               },
             ),
