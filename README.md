@@ -1,17 +1,42 @@
-# on_set_pro
+# On Set Pro
 
-A new Flutter project.
+Herramientas de cine para dirección de fotografía. Funciona en el teléfono y en la
+computadora, sin internet.
 
-## Getting Started
+## Usar la app
 
-This project is a starting point for a Flutter application.
+**https://lopezruanocine-sketch.github.io/on-set-pro/**
 
-A few resources to get you started if this is your first Flutter project:
+Abrila desde el teléfono y agregala a la pantalla de inicio para tenerla como una app.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Qué trae
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| Departamento | Herramientas |
+|---|---|
+| Cámara y óptica | Visor con zonas seguras, óptica/FOV, profundidad de campo |
+| Imagen y exposición | Sistema de zonas, fall-off, compensar, fotometría, flicker |
+| Luz y eléctrico | Circuito, reparto por fases, color y geles (mireds), luz solar |
+| Data y producción | Data y almacenamiento, planes y notas con exportación |
+| Utilidades | Calculadora de cine, linterna |
+
+## Cómo está hecho
+
+Flutter. Los motores de cálculo están separados de la interfaz y cubiertos por
+pruebas: exposición, óptica, eléctrico, data, color, flicker, solar y reparto de
+fases. Se corrige un error en el motor antes de tocar una pantalla.
+
+## Para desarrolladores
+
+```bash
+flutter pub get
+flutter test          # todas las pruebas
+flutter run -d chrome # correr en el navegador
+```
+
+Para publicar una versión nueva:
+
+```bash
+flutter build web --release --base-href /on-set-pro/
+```
+
+El resultado de `build/web` se publica en la rama `gh-pages`.
