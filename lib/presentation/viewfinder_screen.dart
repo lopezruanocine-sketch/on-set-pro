@@ -1,5 +1,9 @@
+import 'dart:ui' as ui;
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../data/camera_devices.dart';
 import '../data/viewfinder_settings.dart';
@@ -31,6 +35,15 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
   double phoneFov = 70;
   bool squeeze2x = false;
   ViewfinderSettings settings = ViewfinderSettings.defaults;
+
+  /// Zona segura de entrega: qué recorte hay que cuidar además del cuadro.
+  String safeZone = 'NINGUNA';
+
+  /// Margen de acción y títulos (90 % del cuadro).
+  bool titleSafe = true;
+
+  final GlobalKey _captureKey = GlobalKey();
+  bool capturing = false;
 
   @override
   void initState() {
@@ -200,7 +213,9 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
         final w = box.maxWidth;
         final frameW = w * frame.widthFraction;
         final frameH = frameW / frame.aspectRatio;
-        return Stack(
+        return RepaintBoundary(
+          key: _captureKey,
+          child: Stack(
           children: [
             Positioned.fill(child: CameraPreview(controller!)),
             Positioned.fill(
@@ -211,6 +226,8 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
                     height: frameH,
                     aspect: frame.aspectRatio,
                     covers: frame.coversSensor,
+                    safeAspect: _safeAspectValue(),
+                    titleSafe: titleSafe,
                   ),
                 ),
               ),
@@ -224,6 +241,7 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
               ),
             ),
           ],
+        ),
         );
       },
     );
@@ -258,6 +276,21 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _safeZonePicker()),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _chip('MARGEN 90 %', titleSafe, () {
+                  setState(() => titleSafe = !titleSafe);
+                  _persist();
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _captureButton(),
           const SizedBox(height: 8),
           Text(
             'Encuadre ${(frame.widthFraction * 100).toStringAsFixed(0)} % del ancho · '
@@ -329,6 +362,115 @@ class _ViewfinderScreenState extends State<ViewfinderScreen> {
       ),
     );
     if (chosen != null) await _start(chosen);
+  }
+
+  double? _safeAspectValue() {
+    switch (safeZone) {
+      case '16:9':
+        return 16 / 9;
+      case '9:16':
+        return 9 / 16;
+      case '4:3':
+        return 4 / 3;
+      case '2.39:1':
+        return 2.39;
+      case '1.85:1':
+        return 1.85;
+      default:
+        return null;
+    }
+  }
+
+  Widget _safeZonePicker() {
+    const options = ['NINGUNA', '16:9', '9:16', '4:3', '2.39:1', '1.85:1'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ZONA SEGURA',
+          style: TextStyle(fontSize: 8, color: Colors.white38, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(color: OnSetColors.surface, border: Border.all(color: Colors.white24)),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: safeZone,
+              isExpanded: true,
+              dropdownColor: OnSetColors.surfaceHigh,
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+              items: options
+                  .map((o) => DropdownMenuItem(
+                        value: o,
+                        child: Text(o, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                setState(() => safeZone = v!);
+                _persist();
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _captureButton() {
+    return GestureDetector(
+      onTap: capturing || controller == null ? null : _capture,
+      child: Container(
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: capturing ? OnSetColors.surfaceHigh : OnSetColors.brand,
+          border: Border.all(color: OnSetColors.brand),
+        ),
+        child: Text(
+          capturing ? 'GUARDANDO…' : 'CAPTURAR CUADRO',
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.bold,
+            color: capturing ? OnSetColors.brand : Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Toma la imagen con el encuadre y las guías dibujadas, para storyboard.
+  Future<void> _capture() async {
+    final box = _captureKey.currentContext;
+    if (box == null) return;
+    setState(() => capturing = true);
+    try {
+      final boundary = box.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 2);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return;
+      final stamp = DateTime.now();
+      final name = 'onset_${stamp.year}${stamp.month.toString().padLeft(2, '0')}'
+          '${stamp.day.toString().padLeft(2, '0')}_'
+          '${stamp.hour.toString().padLeft(2, '0')}'
+          '${stamp.minute.toString().padLeft(2, '0')}.png';
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(data.buffer.asUint8List(), mimeType: 'image/png')],
+          fileNameOverrides: [name],
+          text: 'On Set Pro · ${current?.label ?? ''}',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo capturar el cuadro: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => capturing = false);
+    }
   }
 
   /// Muestra la cámara en uso y deja cambiarla.
@@ -487,12 +629,16 @@ class _FramePainter extends CustomPainter {
   final double height;
   final double aspect;
   final bool covers;
+  final double? safeAspect;
+  final bool titleSafe;
 
   const _FramePainter({
     required this.width,
     required this.height,
     required this.aspect,
     required this.covers,
+    this.safeAspect,
+    this.titleSafe = true,
   });
 
   @override
@@ -516,6 +662,51 @@ class _FramePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawRect(rect, line);
+
+    // Zona segura de entrega (por ejemplo 9:16 dentro del cuadro).
+    final safe = safeAspect;
+    if (safe != null) {
+      double safeW = rect.width;
+      double safeH = safeW / safe;
+      if (safeH > rect.height) {
+        safeH = rect.height;
+        safeW = safeH * safe;
+      }
+      final safeRect = Rect.fromCenter(
+        center: rect.center,
+        width: safeW,
+        height: safeH,
+      );
+      final safePaint = Paint()
+        ..color = Colors.cyanAccent.withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawRect(safeRect, safePaint);
+      canvas.drawPath(
+        Path.combine(
+          PathOperation.difference,
+          Path()..addRect(rect),
+          Path()..addRect(safeRect),
+        ),
+        Paint()..color = Colors.black.withValues(alpha: 0.28),
+      );
+    }
+
+    // Margen de acción y títulos: 90 % del cuadro.
+    if (titleSafe) {
+      final inset = Rect.fromCenter(
+        center: rect.center,
+        width: rect.width * 0.9,
+        height: rect.height * 0.9,
+      );
+      canvas.drawRect(
+        inset,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8,
+      );
+    }
 
     // Terceras y cruz central.
     final thin = Paint()
@@ -541,7 +732,11 @@ class _FramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _FramePainter old) =>
-      old.width != width || old.height != height || old.covers != covers;
+      old.width != width ||
+      old.height != height ||
+      old.covers != covers ||
+      old.safeAspect != safeAspect ||
+      old.titleSafe != titleSafe;
 }
 
 class _FovField extends StatefulWidget {

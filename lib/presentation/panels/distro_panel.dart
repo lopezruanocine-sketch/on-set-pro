@@ -15,13 +15,10 @@ class DistroPanel extends StatefulWidget {
 }
 
 class _DistroPanelState extends State<DistroPanel> {
-  final List<_DistroLoad> loads = [
-    _DistroLoad(name: 'M18', watts: 1800),
-    _DistroLoad(name: 'M18', watts: 1800),
-    _DistroLoad(name: 'Skypanel S60', watts: 900),
-    _DistroLoad(name: 'Skypanel S60', watts: 900),
-    _DistroLoad(name: 'LED panel', watts: 200),
-  ];
+  /// Arranca vacío: la distro se arma con lo que hay en el camión, y los
+  /// watts son el único dato que la app necesita. No hace falta un catálogo
+  /// de luces: cambia todos los años y nunca está completo.
+  final List<_DistroLoad> loads = [];
   double voltage = 380;
   double limitAmps = 32;
 
@@ -44,9 +41,43 @@ class _DistroPanelState extends State<DistroPanel> {
             _phases(plan),
             const SizedBox(height: 22),
             _section('CARGAS'),
+            if (loads.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Cargá las luminarias con sus watts (los que dice la lámpara o el '
+                  'balasto). La app reparte sola: cada carga va a la fase más liviana.',
+                  style: const TextStyle(fontSize: 10, color: Colors.white38, height: 1.4),
+                ),
+              ),
             ..._loadRows(plan),
             const SizedBox(height: 10),
             _addLoad(),
+            if (loads.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    loads.addAll(const [
+                      _DistroLoad(name: '2 kW (HMI)', watts: 2000),
+                      _DistroLoad(name: '2 kW (HMI)', watts: 2000),
+                      _DistroLoad(name: 'Panel LED', watts: 900),
+                      _DistroLoad(name: 'Panel LED', watts: 900),
+                      _DistroLoad(name: 'LED chico', watts: 200),
+                    ]);
+                  }),
+                  child: const Text(
+                    'CARGAR UN EJEMPLO',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: OnSetColors.power,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 22),
             _settings(),
             const SizedBox(height: 18),
@@ -100,6 +131,19 @@ class _DistroPanelState extends State<DistroPanel> {
             '${plan.assigned.length} cargas',
             style: const TextStyle(fontSize: 11, color: Colors.white38),
           ),
+          if (plan.assigned.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'La más pesada fue a la fase más liviana: así el neutro no se carga '
+              'de más. Si una carga tiene que ir sí o sí en una fase, la podés '
+              'mover tocando su número de fase.',
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.4,
+                color: Colors.white.withValues(alpha: 0.35),
+              ),
+            ),
+          ],
         ],
       ),
     );

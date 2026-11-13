@@ -34,8 +34,9 @@ void main() {
     expect(find.text('FASE 1'), findsOneWidget);
     expect(find.text('FASE 2'), findsOneWidget);
     expect(find.text('FASE 3'), findsOneWidget);
-    expect(find.textContaining('5 cargas'), findsOneWidget);
-    expect(find.textContaining('Desbalance'), findsOneWidget);
+    // La distro arranca vacía: se carga con lo que hay en el camión.
+    expect(find.textContaining('Cargá las luminarias'), findsOneWidget);
+    expect(find.text('CARGAR UN EJEMPLO'), findsOneWidget);
   });
 
   testWidgets('agregar una carga a la distro actualiza el total', (tester) async {
@@ -52,7 +53,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('6 cargas'), findsOneWidget);
+    expect(find.textContaining('1 cargas'), findsOneWidget);
     expect(find.text('C12'), findsOneWidget);
   });
 }

@@ -78,7 +78,9 @@ class _ColorScreenState extends State<ColorScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _resultCard(shift, needed, cameraMired, best),
-            const SizedBox(height: 30),
+            const SizedBox(height: 14),
+            _appliedGels(),
+            const SizedBox(height: 26),
             _sectionTitle('1. BALANCE DE TEMPERATURA'),
             _presetRow('FUENTE', [
               ('TUNGSTENO 3200', sourceK == 3200, () => setState(() => sourceK = 3200)),
@@ -112,6 +114,63 @@ class _ColorScreenState extends State<ColorScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Gelatinas ya aplicadas al plano, para ver y quitar sin salir.
+  Widget _appliedGels() {
+    final gels = ShotState.instance.gels;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: OnSetColors.surface,
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'EN EL PLANO',
+            style: TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 1),
+          ),
+          const SizedBox(height: 8),
+          if (gels.isEmpty)
+            const Text(
+              'Ninguna gelatina aplicada. Las que pongas acá son las que '
+              'descuentan luz en Exposición.',
+              style: TextStyle(fontSize: 10, color: Colors.white38, height: 1.4),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final g in gels)
+                  GestureDetector(
+                    onTap: () {
+                      ShotState.instance.removeGel(g);
+                      setState(() {});
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        border: Border.all(color: OnSetColors.power.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(g.label, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.close, size: 11, color: Colors.white38),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -197,6 +256,30 @@ class _ColorScreenState extends State<ColorScreen> {
               'pierde ${best.gel.stops.toStringAsFixed(2)} stops',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          ],
+          if (best != null) ...[
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: () {
+                ShotState.instance.addGel(best.gel);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${best.gel.label} aplicada al plano.')),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(border: Border.all(color: OnSetColors.power)),
+                child: const Text(
+                  'APLICAR AL PLANO',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.bold,
+                    color: OnSetColors.power,
+                  ),
+                ),
+              ),
             ),
           ],
           if (best == null || best.errorMired > 40) ...[

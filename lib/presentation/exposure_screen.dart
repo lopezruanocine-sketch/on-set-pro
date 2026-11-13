@@ -6,11 +6,11 @@ import '../core/cine_data.dart';
 import '../core/localization.dart';
 import '../core/pro_input.dart';
 import '../data/catalogs/camera_filters.dart';
-import '../data/catalogs/light_gels.dart';
 import '../data/shots_repository.dart';
 import '../domain/exposure/exposure_engine.dart';
 import '../domain/exposure/exposure_recipes.dart';
 import '../state/shot_state.dart';
+import 'color_screen.dart';
 import '../theme/app_theme.dart';
 
 /// Las cuatro herramientas de exposición, conectadas al motor de cálculo.
@@ -524,17 +524,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               const SizedBox(height: 20),
               _sectionLabel('GELATINAS EN LA LUZ (DELANTE DE LA FUENTE)'),
               const SizedBox(height: 8),
-              _lossList(
-                items: [
-                  for (final g in shot.gels) (g.label, g.stops),
-                ],
-                options: LightGels.all.map((g) => g.label).toList(),
-                emptyText: 'Sin gelatinas: la fuente va limpia.',
-                onAdd: (label) => shot.addGel(
-                  LightGels.all.firstWhere((g) => g.label == label),
-                ),
-                onRemove: (i) => shot.removeGel(shot.gels[i]),
-              ),
+              _gelSummary(context, shot),
               const SizedBox(height: 12),
               _manualInput(
                 'FUENTE PRINCIPAL A (m)',
@@ -1318,6 +1308,83 @@ class _ManualFieldState extends State<_ManualField> {
 ///
 /// Se pueden apilar: un ND + polarizador delante del sensor, un CTO + difusión
 /// delante de la fuente. Cada uno aporta sus pasos y el total se muestra aparte.
+/// Las gelatinas se eligen en Color (donde se decide por temperatura) y acá
+/// sólo se muestran: así no hay dos lugares donde elegir lo mismo.
+Widget _gelSummary(BuildContext context, ShotState shot) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (shot.gels.isEmpty)
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Sin gelatinas: la fuente va limpia.',
+                style: TextStyle(fontSize: 10, color: Colors.white38),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ColorScreen()),
+              ),
+              child: const Text(
+                'ELEGIR EN COLOR',
+                style: TextStyle(fontSize: 9, color: OnSetColors.power, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        )
+      else ...[
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final g in shot.gels)
+              GestureDetector(
+                onTap: () => shot.removeGel(g),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: OnSetColors.surface,
+                    border: Border.all(color: OnSetColors.power.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(g.label, style: const TextStyle(fontSize: 11, color: Colors.white)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '−${g.stops.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 11, color: OnSetColors.danger, fontFamily: 'monospace'),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.close, size: 12, color: Colors.white38),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ColorScreen()),
+            ),
+            child: const Text(
+              'CAMBIAR EN COLOR',
+              style: TextStyle(fontSize: 9, color: OnSetColors.power, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
 Widget _lossList({
   required List<(String, double)> items,
   required List<String> options,
