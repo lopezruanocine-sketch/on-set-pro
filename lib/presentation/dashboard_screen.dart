@@ -8,8 +8,11 @@ import 'color_screen.dart';
 import 'optics_screen.dart';
 import '../theme/app_theme.dart';
 import 'camera_setup_screen.dart';
+import 'distro_screen.dart';
 import 'light_screen.dart';
+import 'nd_quick_screen.dart';
 import 'shots_log_screen.dart';
+import 'solar_screen.dart';
 import '../data/camera_selection.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -203,6 +206,39 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ColorScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'ND RÁPIDO',
+              icon: Icons.filter_tilt_shift,
+              accent: OnSetColors.camera,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NdQuickScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'LUZ SOLAR',
+              icon: Icons.wb_twilight,
+              accent: OnSetColors.tools,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SolarScreen()),
+                );
+              },
+            ),
+            _buildDashboardCard(
+              title: 'DISTRO ELÉCTRICA',
+              icon: Icons.electrical_services,
+              accent: OnSetColors.power,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DistroScreen()),
                 );
               },
             ),
