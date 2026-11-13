@@ -157,8 +157,8 @@ class _ZoneSystemScreenState extends State<ZoneSystemScreen> {
               ),
               const SizedBox(height: 30),
               _resultCard(
-                stops: reading.correctionStops,
-                title: 'INSTRUCCIÓN PARA ILUMINACIÓN',
+                deviation: -reading.correctionStops,
+                title: 'CÓMO ESTÁ LA ESCENA',
                 subtitle: _zoneSubtitle(reading, nd),
               ),
               if (nd != null) ...[
@@ -284,8 +284,8 @@ class _ISTState extends State<InverseSquareTool> {
           ),
           const SizedBox(height: 25),
           _resultCard(
-            stops: result.stops,
-            title: 'PÉRDIDA / GANANCIA',
+            deviation: result.stops,
+            title: 'LA LUZ CAMBIA',
             subtitle: isLoss
                 ? 'La fuente pierde ${result.stops.abs().toStringAsFixed(1)} stops al alejarse. '
                     'Abrí ese diafragma, subí la intensidad o acercá la fuente.'
@@ -536,7 +536,7 @@ class _ExposureCompensationScreenState extends State<ExposureCompensationScreen>
               _meterGelToggle(shot),
               const SizedBox(height: 30),
               _resultCard(
-                stops: result.stops,
+                deviation: -result.stops,
                 title: 'DESBALANCE',
               ),
               const SizedBox(height: 16),
@@ -1189,17 +1189,20 @@ Widget _legendDot(Color color, String label) {
 }
 
 Widget _resultCard({
-  required double stops,
+  /// Cuánto está desviada la imagen: **negativo = abajo** (falta luz),
+  /// **positivo = arriba** (sobra luz). La acción es siempre al revés.
+  required double deviation,
   required String title,
   String? subtitle,
-  String? ndHint,
 }) {
-  final balanced = stops.abs() < 0.05;
+  final balanced = deviation.abs() < 0.05;
   // Rojo cuando falta luz: es el caso que obliga a sumar unidades o potencia.
   // Ámbar cuando sobra: se resuelve cerrando o con un filtro.
   final accent = balanced
       ? OnSetColors.ok
-      : (stops > 0 ? OnSetColors.danger : OnSetColors.brand);
+      : (deviation < 0 ? OnSetColors.danger : OnSetColors.brand);
+  final amount = deviation.abs().toStringAsFixed(1).replaceAll('.', ',');
+  final action = deviation < 0 ? 'SUMÁ $amount PASOS' : 'QUITÁ $amount PASOS';
 
   return Container(
     width: double.infinity,
@@ -1217,7 +1220,9 @@ Widget _resultCard({
         ),
         const SizedBox(height: 12),
         Text(
-          balanced ? 'OK' : '${stops > 0 ? '+' : ''}${stops.toStringAsFixed(1)} PASOS',
+          balanced
+              ? 'OK'
+              : '${deviation > 0 ? '+' : '−'}${deviation.abs().toStringAsFixed(1)} PASOS',
           style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, color: accent),
         ),
         if (!balanced) ...[
@@ -1228,9 +1233,7 @@ Widget _resultCard({
               border: Border.all(color: Colors.white24),
             ),
             child: Text(
-              stops > 0
-                  ? 'SUMÁ ${stops.abs().toStringAsFixed(1).replaceAll('.', ',')} PASOS'
-                  : 'QUITÁ ${stops.abs().toStringAsFixed(1).replaceAll('.', ',')} PASOS',
+              action,
               style: const TextStyle(
                 fontSize: 11,
                 letterSpacing: 1.5,
@@ -1246,24 +1249,6 @@ Widget _resultCard({
             subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 11, color: Colors.white54, height: 1.4),
-          ),
-        ],
-        if (ndHint != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(color: OnSetColors.danger.withValues(alpha: 0.6)),
-            ),
-            child: Text(
-              'O PONÉ $ndHint',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-                color: OnSetColors.danger,
-              ),
-            ),
           ),
         ],
       ],
