@@ -58,8 +58,27 @@ class DashboardScreen extends StatelessWidget {
 
   List<_Department> get _departments => [
         _Department(
+          name: 'LUZ Y ENERGÍA',
+          purpose: 'encender: fuentes, corriente y hora solar',
+          color: OnSetColors.power,
+          tools: [
+            _Tool(
+              title: 'ELÉCTRICO',
+              detail: 'circuito y reparto de cargas por fase',
+              icon: Icons.bolt_outlined,
+              open: (context) => const ElectricityScreen(),
+            ),
+            _Tool(
+              title: 'LUZ SOLAR',
+              detail: 'hora azul, dorada y posición del sol',
+              icon: Icons.wb_twilight,
+              open: (context) => const SolarScreen(),
+            ),
+          ],
+        ),
+        _Department(
           name: 'CÁMARA Y ÓPTICA',
-          purpose: 'encuadre, foco y filtros',
+          purpose: 'armar: encuadre, lente y foco',
           color: OnSetColors.camera,
           tools: [
             _Tool(
@@ -84,7 +103,7 @@ class DashboardScreen extends StatelessWidget {
         ),
         _Department(
           name: 'IMAGEN Y EXPOSICIÓN',
-          purpose: 'la luz que llega al sensor',
+          purpose: 'exponer y corregir: la luz que llega al sensor',
           color: OnSetColors.image,
           tools: [
             _Tool(
@@ -92,6 +111,12 @@ class DashboardScreen extends StatelessWidget {
               detail: 'zonas, fall-off, compensar y fotometría',
               icon: Icons.exposure_outlined,
               open: (context) => const ExpoFotoTabs(),
+            ),
+            _Tool(
+              title: 'COLOR Y GELES',
+              detail: 'temperatura, mireds y gelatinas',
+              icon: Icons.palette_outlined,
+              open: (context) => const ColorScreen(),
             ),
             _Tool(
               title: 'FLICKER Y PARPADEO',
@@ -102,33 +127,8 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         _Department(
-          name: 'LUZ Y ELÉCTRICO',
-          purpose: 'fuentes, energía y color',
-          color: OnSetColors.power,
-          tools: [
-            _Tool(
-              title: 'ELÉCTRICO',
-              detail: 'circuito y reparto de cargas por fase',
-              icon: Icons.bolt_outlined,
-              open: (context) => const ElectricityScreen(),
-            ),
-            _Tool(
-              title: 'COLOR Y GELES',
-              detail: 'temperatura, mireds y gelatinas',
-              icon: Icons.palette_outlined,
-              open: (context) => const ColorScreen(),
-            ),
-            _Tool(
-              title: 'LUZ SOLAR',
-              detail: 'hora azul, dorada y posición del sol',
-              icon: Icons.wb_twilight,
-              open: (context) => const SolarScreen(),
-            ),
-          ],
-        ),
-        _Department(
           name: 'DATA Y PRODUCCIÓN',
-          purpose: 'material y registro del rodaje',
+          purpose: 'grabar y registrar: material y planos',
           color: OnSetColors.data,
           tools: [
             _Tool(
@@ -147,7 +147,7 @@ class DashboardScreen extends StatelessWidget {
         ),
         _Department(
           name: 'UTILIDADES',
-          purpose: 'lo que se usa todo el tiempo',
+          purpose: 'lo transversal: cuentas y linterna',
           color: OnSetColors.tools,
           tools: [
             _Tool(

@@ -11,11 +11,13 @@ Abrila desde el teléfono y agregala a la pantalla de inicio para tenerla como u
 
 ## Qué trae
 
+El menú sigue el flujo de un rodaje, de arriba abajo:
+
 | Departamento | Herramientas |
 |---|---|
+| Luz y energía | Circuito y reparto por fases, luz solar (hora azul y dorada) |
 | Cámara y óptica | Visor con zonas seguras, óptica/FOV, profundidad de campo |
-| Imagen y exposición | Sistema de zonas, fall-off, compensar, fotometría, flicker |
-| Luz y eléctrico | Circuito, reparto por fases, color y geles (mireds), luz solar |
+| Imagen y exposición | Sistema de zonas, color y geles, flicker |
 | Data y producción | Data y almacenamiento, planes y notas con exportación |
 | Utilidades | Calculadora de cine, linterna |
 

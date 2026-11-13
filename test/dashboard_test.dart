@@ -26,9 +26,9 @@ void main() {
   testWidgets('el menú está agrupado en cinco departamentos', (tester) async {
     await pump(tester);
     for (final name in [
+      'LUZ Y ENERGÍA',
       'CÁMARA Y ÓPTICA',
       'IMAGEN Y EXPOSICIÓN',
-      'LUZ Y ELÉCTRICO',
       'DATA Y PRODUCCIÓN',
       'UTILIDADES',
     ]) {
